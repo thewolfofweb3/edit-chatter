@@ -29,7 +29,7 @@ function Studio() {
   const [chatWidth, setChatWidth] = useState(380);
   const [tool, setTool] = useState<Tool>("select");
   const [selection, setSelection] = useState<Sel | null>(null);
-  const [pendingSel, setPendingSel] = useState<Sel | null>(null);
+  
   const [drawing, setDrawing] = useState<{ x: number; y: number } | null>(null);
 
   const draggingRef = useRef(false);
