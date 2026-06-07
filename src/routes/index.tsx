@@ -349,7 +349,9 @@ function Studio() {
                   <>
                     <span className="text-muted-foreground/60">/</span>
                     <span className="flex items-center gap-1 text-foreground/90 animate-in fade-in slide-in-from-left-1 duration-200">
-                      untitled-project <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                    <span className="group flex items-center gap-1 text-foreground/90 cursor-pointer">
+                      untitled-project <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+                    </span>
                     </span>
                   </>
                 )}
