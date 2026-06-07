@@ -656,13 +656,50 @@ function Studio() {
                         </div>
                       )}
                     </div>
-                    <button
-                      onClick={send}
-                      className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40"
-                      disabled={!input.trim() && pendingAttachments.length === 0}
-                    >
-                      Send <Send className="h-3 w-3" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <div className="relative" ref={modeRef}>
+                        <button
+                          onClick={() => setModeOpen((v) => !v)}
+                          className="h-7 px-2 rounded-md text-xs font-medium flex items-center gap-1 text-muted-foreground hover:text-foreground hover:bg-accent border border-border"
+                          title="Mode"
+                        >
+                          {mode === "build" ? <Wand2 className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                          <span className="capitalize">{mode}</span>
+                          <ChevronDown className={`h-3 w-3 transition-transform ${modeOpen ? "rotate-180" : ""}`} />
+                        </button>
+                        {modeOpen && (
+                          <div className="absolute bottom-full right-0 mb-2 w-44 rounded-lg border border-border bg-popover shadow-lg p-1 z-50">
+                            <button
+                              onClick={() => { setMode("build"); setModeOpen(false); }}
+                              className={`w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left hover:bg-accent ${mode === "build" ? "bg-accent" : ""}`}
+                            >
+                              <Wand2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
+                              <div>
+                                <div className="text-xs font-medium">Build</div>
+                                <div className="text-[10px] text-muted-foreground">Make changes directly</div>
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => { setMode("plan"); setModeOpen(false); }}
+                              className={`w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left hover:bg-accent ${mode === "plan" ? "bg-accent" : ""}`}
+                            >
+                              <FileText className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
+                              <div>
+                                <div className="text-xs font-medium">Plan</div>
+                                <div className="text-[10px] text-muted-foreground">Draft before building</div>
+                              </div>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={send}
+                        className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40"
+                        disabled={!input.trim() && pendingAttachments.length === 0}
+                      >
+                        Send <Send className="h-3 w-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
