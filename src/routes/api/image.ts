@@ -16,6 +16,21 @@ type ImageRequest = {
 export const Route = createFileRoute("/api/image")({
   server: {
     handlers: {
+      GET: async () => {
+        return new Response(JSON.stringify({ error: "Method not allowed. Use POST." }), {
+          status: 405,
+          headers: {
+            "Content-Type": "application/json",
+            Allow: "POST, OPTIONS",
+          },
+        });
+      },
+      OPTIONS: async () => {
+        return new Response(null, {
+          status: 204,
+          headers: { Allow: "POST, OPTIONS" },
+        });
+      },
       POST: async ({ request }) => {
         const key = process.env.OPENROUTER_API_KEY;
         if (!key) {
