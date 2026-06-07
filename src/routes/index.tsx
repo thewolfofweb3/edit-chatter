@@ -60,7 +60,7 @@ function Studio() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const plusRef = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<"video" | "photo">("video");
+  const [mode, setMode] = useState<"video" | "photo">("photo");
   const [modeOpen, setModeOpen] = useState(false);
   const modeRef = useRef<HTMLDivElement>(null);
 
