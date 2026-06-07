@@ -99,6 +99,10 @@ function Studio() {
 
   const [drawing, setDrawing] = useState<{ x: number; y: number } | null>(null);
 
+  // Preview image (the AI-generated / edited image shown in the canvas).
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isThinking, setIsThinking] = useState(false);
+
   const draggingRef = useRef(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
