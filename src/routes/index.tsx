@@ -420,6 +420,7 @@ function Studio() {
               onMouseMove={onCanvasMove}
               onMouseUp={onCanvasUp}
               onMouseLeave={onCanvasUp}
+              onDoubleClick={() => { setStrokes([]); setCurrentStroke(null); }}
               style={{ aspectRatio: SIZE_PRESETS[sizeIdx].ratio }}
               className={`relative w-full max-w-6xl max-h-full rounded-lg overflow-hidden border border-border shadow-2xl bg-[oklch(0.08_0.003_270)] select-none ${cursorClass}`}
             >
