@@ -51,7 +51,7 @@ function Studio() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const plusRef = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<"build" | "plan">("build");
+  const [mode, setMode] = useState<"video" | "photo">("video");
   const [modeOpen, setModeOpen] = useState(false);
   const modeRef = useRef<HTMLDivElement>(null);
 
@@ -663,30 +663,30 @@ function Studio() {
                           className="h-7 px-2 rounded-md text-xs font-medium flex items-center gap-1 text-muted-foreground hover:text-foreground hover:bg-accent border border-border"
                           title="Mode"
                         >
-                          {mode === "build" ? <Wand2 className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                          {mode === "video" ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
                           <span className="capitalize">{mode}</span>
                           <ChevronDown className={`h-3 w-3 transition-transform ${modeOpen ? "rotate-180" : ""}`} />
                         </button>
                         {modeOpen && (
                           <div className="absolute bottom-full right-0 mb-2 w-44 rounded-lg border border-border bg-popover shadow-lg p-1 z-50">
                             <button
-                              onClick={() => { setMode("build"); setModeOpen(false); }}
-                              className={`w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left hover:bg-accent ${mode === "build" ? "bg-accent" : ""}`}
+                              onClick={() => { setMode("video"); setModeOpen(false); }}
+                              className={`w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left hover:bg-accent ${mode === "video" ? "bg-accent" : ""}`}
                             >
-                              <Wand2 className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
+                              <Film className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
                               <div>
-                                <div className="text-xs font-medium">Build</div>
-                                <div className="text-[10px] text-muted-foreground">Make changes directly</div>
+                                <div className="text-xs font-medium">Video</div>
+                                <div className="text-[10px] text-muted-foreground">Generate & edit videos</div>
                               </div>
                             </button>
                             <button
-                              onClick={() => { setMode("plan"); setModeOpen(false); }}
-                              className={`w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left hover:bg-accent ${mode === "plan" ? "bg-accent" : ""}`}
+                              onClick={() => { setMode("photo"); setModeOpen(false); }}
+                              className={`w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left hover:bg-accent ${mode === "photo" ? "bg-accent" : ""}`}
                             >
-                              <FileText className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
+                              <ImageIcon className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
                               <div>
-                                <div className="text-xs font-medium">Plan</div>
-                                <div className="text-[10px] text-muted-foreground">Draft before building</div>
+                                <div className="text-xs font-medium">Photo</div>
+                                <div className="text-[10px] text-muted-foreground">Generate & edit images</div>
                               </div>
                             </button>
                           </div>
