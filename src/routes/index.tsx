@@ -603,7 +603,7 @@ function Studio() {
               </div>
 
               {/* Composer */}
-              <div className="p-3 border-t border-border">
+              <div className="p-3">
                 <input
                   ref={fileInputRef}
                   type="file"
