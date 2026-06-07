@@ -4,7 +4,7 @@ import {
   Image as ImageIcon, Film, Layers, Wand2, Settings,
   Folder, Download, Upload, Send, ChevronDown,
   MessageSquarePlus, PanelRightClose, History, Paperclip,
-  SquareDashedMousePointer, MousePointer2, Hand, X,
+  SquareDashedMousePointer, MousePointer2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -17,9 +17,9 @@ export const Route = createFileRoute("/")({
   component: Studio,
 });
 
-type Msg = { id: number; role: "user" | "ai"; text: string; selection?: Sel };
+type Msg = { id: number; role: "user" | "ai"; text: string };
 type Sel = { x: number; y: number; w: number; h: number };
-type Tool = "move" | "select" | "hand";
+type Tool = "move" | "select";
 
 function Studio() {
   const [messages, setMessages] = useState<Msg[]>([
@@ -29,7 +29,7 @@ function Studio() {
   const [chatWidth, setChatWidth] = useState(380);
   const [tool, setTool] = useState<Tool>("select");
   const [selection, setSelection] = useState<Sel | null>(null);
-  const [pendingSel, setPendingSel] = useState<Sel | null>(null);
+  
   const [drawing, setDrawing] = useState<{ x: number; y: number } | null>(null);
 
   const draggingRef = useRef(false);
@@ -97,11 +97,10 @@ function Studio() {
 
   function send() {
     const t = input.trim();
-    if (!t && !pendingSel) return;
+    if (!t) return;
     const id = Date.now();
-    setMessages((m) => [...m, { id, role: "user", text: t, selection: pendingSel ?? undefined }]);
+    setMessages((m) => [...m, { id, role: "user", text: t }]);
     setInput("");
-    setPendingSel(null);
     setTimeout(() => {
       setMessages((m) => [
         ...m,
@@ -129,15 +128,13 @@ function Studio() {
     });
   }
   function onCanvasUp() {
-    if (drawing && selection && selection.w > 8 && selection.h > 8) {
-      setPendingSel(selection);
-      setTimeout(() => composerRef.current?.focus(), 0);
+    if (drawing && selection && (selection.w < 8 || selection.h < 8)) {
+      setSelection(null);
     }
     setDrawing(null);
   }
 
-  const cursorClass =
-    tool === "select" ? "cursor-crosshair" : tool === "hand" ? "cursor-grab" : "cursor-default";
+  const cursorClass = tool === "select" ? "cursor-crosshair" : "cursor-default";
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden">
@@ -205,7 +202,6 @@ function Studio() {
               {[
                 { id: "move", Icon: MousePointer2, label: "Move" },
                 { id: "select", Icon: SquareDashedMousePointer, label: "Highlight area" },
-                { id: "hand", Icon: Hand, label: "Pan" },
               ].map(({ id, Icon, label }) => (
                 <button
                   key={id}
@@ -296,14 +292,6 @@ function Studio() {
                       : "bg-accent text-foreground rounded-bl-sm"
                   }`}
                 >
-                  {m.selection && (
-                    <div className={`mb-1.5 inline-flex items-center gap-1.5 text-[11px] px-1.5 py-0.5 rounded ${
-                      m.role === "user" ? "bg-primary-foreground/15" : "bg-foreground/10"
-                    }`}>
-                      <SquareDashedMousePointer className="h-3 w-3" />
-                      highlighted area
-                    </div>
-                  )}
                   {m.text && <div>{m.text}</div>}
                 </div>
               </div>
@@ -313,17 +301,6 @@ function Studio() {
           {/* Composer */}
           <div className="p-3 border-t border-border">
             <div className="rounded-xl bg-input/60 border border-border focus-within:border-primary/60 transition-colors">
-              {pendingSel && (
-                <div className="px-3 pt-2.5">
-                  <div className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-primary/15 text-primary border border-primary/30">
-                    <SquareDashedMousePointer className="h-3.5 w-3.5" />
-                    Highlighted area attached
-                    <button onClick={() => setPendingSel(null)} className="hover:opacity-70">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              )}
               <textarea
                 ref={composerRef}
                 value={input}
@@ -335,7 +312,7 @@ function Studio() {
                   }
                 }}
                 rows={2}
-                placeholder={pendingSel ? "Ask about the highlighted area…" : "Type here — ask the AI to edit, generate, or refine…"}
+                placeholder="Type here — ask the AI to edit, generate, or refine…"
                 className="w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
               />
               <div className="flex items-center justify-between px-2 pb-2">
@@ -345,7 +322,7 @@ function Studio() {
                 <button
                   onClick={send}
                   className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40"
-                  disabled={!input.trim() && !pendingSel}
+                  disabled={!input.trim()}
                 >
                   Send <Send className="h-3 w-3" />
                 </button>
