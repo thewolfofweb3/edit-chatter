@@ -7,7 +7,9 @@ import {
   SquareDashedMousePointer, MousePointer2, Plus, Brush,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
   LayoutGrid, Library, Sparkles, Clock, Save, LayoutTemplate, GraduationCap,
+  Target,
 } from "lucide-react";
+import { buildMaskDataUrl, compositeWithMask, dataUrlToBase64, loadImage } from "@/lib/imageOps";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -96,6 +98,10 @@ function Studio() {
   const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
 
   const [drawing, setDrawing] = useState<{ x: number; y: number } | null>(null);
+
+  // Preview image (the AI-generated / edited image shown in the canvas).
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isThinking, setIsThinking] = useState(false);
 
   const draggingRef = useRef(false);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -200,25 +206,132 @@ function Studio() {
     setChats((cs) => cs.map((c) => (c.id === id ? updater(c) : c)));
   }
 
-  function send() {
-    const t = input.trim();
-    if (!t && pendingAttachments.length === 0) return;
-    const id = Date.now();
-    const atts = pendingAttachments;
+  function pushMessage(role: "user" | "ai", text: string, attachments?: Attachment[]) {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
     updateChat(currentChatId, (c) => ({
       ...c,
       updatedAt: Date.now(),
-      messages: [...c.messages, { id, role: "user", text: t, attachments: atts.length ? atts : undefined }],
+      messages: [...c.messages, { id, role, text, attachments }],
     }));
+    return id;
+  }
+
+  async function send() {
+    const t = input.trim();
+    if ((!t && pendingAttachments.length === 0) || isThinking) return;
+
+    // Snapshot any masked region as a chat attachment so the user can SEE
+    // exactly what the AI is being shown.
+    const hasStrokes = strokes.length > 0 && !!previewImage;
+    const userAtts: Attachment[] = [...pendingAttachments];
+    let maskDataUrl: string | null = null;
+
+    if (hasStrokes && previewImage && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      try {
+        const img = await loadImage(previewImage);
+        maskDataUrl = buildMaskDataUrl(
+          strokes,
+          rect.width,
+          rect.height,
+          img.naturalWidth,
+          img.naturalHeight,
+          18,
+        );
+        // Build a visual preview chip = original w/ red stroke overlay.
+        const chip = document.createElement("canvas");
+        chip.width = img.naturalWidth;
+        chip.height = img.naturalHeight;
+        const cctx = chip.getContext("2d")!;
+        cctx.drawImage(img, 0, 0);
+        const maskImg = await loadImage(maskDataUrl);
+        cctx.globalAlpha = 0.55;
+        cctx.globalCompositeOperation = "source-over";
+        // Tint the mask red.
+        const tint = document.createElement("canvas");
+        tint.width = chip.width; tint.height = chip.height;
+        const tctx = tint.getContext("2d")!;
+        tctx.drawImage(maskImg, 0, 0);
+        tctx.globalCompositeOperation = "source-in";
+        tctx.fillStyle = "rgba(239, 68, 68, 1)";
+        tctx.fillRect(0, 0, tint.width, tint.height);
+        cctx.drawImage(tint, 0, 0);
+        cctx.globalAlpha = 1;
+        userAtts.push({
+          id: Date.now(),
+          name: "highlighted-region.png",
+          type: "image/png",
+          url: chip.toDataURL("image/png"),
+        });
+      } catch (e) {
+        console.error("mask snapshot failed", e);
+      }
+    }
+
+    pushMessage("user", t, userAtts.length ? userAtts : undefined);
     setInput("");
     setPendingAttachments([]);
-    setTimeout(() => {
-      updateChat(currentChatId, (c) => ({
-        ...c,
-        updatedAt: Date.now(),
-        messages: [...c.messages, { id: id + 1, role: "ai", text: "Got it — working on that." }],
-      }));
-    }, 500);
+    setIsThinking(true);
+
+    try {
+      if (mode === "video") {
+        // Phase 2 — call chat LLM for a friendly response.
+        const r = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: t || "(no message)" }],
+          }),
+        });
+        const data = await r.json();
+        pushMessage(
+          "ai",
+          data.text ??
+            "Video generation is arriving in phase 2 — image pipeline ships first.",
+        );
+        return;
+      }
+
+      // PHOTO MODE
+      const isEdit = !!previewImage && hasStrokes;
+      const r = await fetch("/api/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: t || (isEdit ? "Edit the highlighted region" : "Generate an image"),
+          mode: isEdit ? "edit" : "generate",
+          imageBase64: isEdit && previewImage ? dataUrlToBase64(previewImage) : undefined,
+          maskBase64: isEdit && maskDataUrl ? dataUrlToBase64(maskDataUrl) : undefined,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.dataUrl) {
+        pushMessage("ai", `⚠️ ${data.error || "Image generation failed"}`);
+        return;
+      }
+
+      let finalDataUrl: string = data.dataUrl;
+      if (isEdit && previewImage && maskDataUrl) {
+        // Strict composite: original pixels outside the mask stay byte-identical.
+        try {
+          finalDataUrl = await compositeWithMask(previewImage, data.dataUrl, maskDataUrl);
+        } catch (e) {
+          console.error("composite failed, using raw edit", e);
+        }
+      }
+
+      setPreviewImage(finalDataUrl);
+      setStrokes([]);
+      setCurrentStroke(null);
+      pushMessage("ai", isEdit ? "Edited the highlighted region." : "Generated.", [
+        { id: Date.now(), name: isEdit ? "edited.png" : "generated.png", type: "image/png", url: finalDataUrl },
+      ]);
+    } catch (e) {
+      console.error(e);
+      pushMessage("ai", `⚠️ ${e instanceof Error ? e.message : "Request failed"}`);
+    } finally {
+      setIsThinking(false);
+    }
   }
 
   function newChat() {
@@ -453,14 +566,23 @@ function Studio() {
               style={{ aspectRatio: SIZE_PRESETS[sizeIdx].ratio }}
               className={`relative w-full max-w-6xl max-h-full rounded-lg overflow-hidden border border-border shadow-2xl bg-[oklch(0.08_0.003_270)] select-none ${cursorClass}`}
             >
-              <div className="absolute inset-0 grid place-items-center text-center px-6 pointer-events-none">
-                <div>
-                  <p className="text-foreground/80 text-base font-medium">Preview</p>
-                  <p className="text-muted-foreground text-sm mt-1">
-                    Your image or video will appear here. Use the highlight tool to ask about a specific area.
-                  </p>
+              {previewImage ? (
+                <img
+                  src={previewImage}
+                  alt="Preview"
+                  draggable={false}
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+                />
+              ) : (
+                <div className="absolute inset-0 grid place-items-center text-center px-6 pointer-events-none">
+                  <div>
+                    <p className="text-foreground/80 text-base font-medium">Preview</p>
+                    <p className="text-muted-foreground text-sm mt-1">
+                      Ask the AI to generate an image. Then use the brush to highlight what to change.
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {selection && (
                 <div
@@ -671,6 +793,18 @@ function Studio() {
                     </div>
                   </div>
                 ))}
+                {isThinking && (
+                  <div className="flex justify-start">
+                    <div className="rounded-2xl rounded-bl-sm bg-accent px-3.5 py-2 text-sm text-muted-foreground inline-flex items-center gap-2">
+                      <span className="thinking-shimmer">Thinking</span>
+                      <span className="inline-flex gap-0.5">
+                        <span className="thinking-dot" style={{ animationDelay: "0ms" }}>.</span>
+                        <span className="thinking-dot" style={{ animationDelay: "150ms" }}>.</span>
+                        <span className="thinking-dot" style={{ animationDelay: "300ms" }}>.</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Composer */}
@@ -682,6 +816,12 @@ function Studio() {
                   className="hidden"
                   onChange={onPickFiles}
                 />
+                {previewImage && strokes.length > 0 && (
+                  <div className="mb-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/10 border border-primary/30 text-xs text-foreground">
+                    <Target className="h-3 w-3 text-primary" />
+                    <span>Editing highlighted region — your next message edits only the brushed area.</span>
+                  </div>
+                )}
                 <div className="rounded-xl bg-input/60 border border-border focus-within:border-primary/60 transition-colors">
                   {pendingAttachments.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 p-2 border-b border-border/60">
@@ -777,7 +917,7 @@ function Studio() {
                       <button
                         onClick={send}
                         className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40"
-                        disabled={!input.trim() && pendingAttachments.length === 0}
+                        disabled={isThinking || (!input.trim() && pendingAttachments.length === 0)}
                       >
                         Send <Send className="h-3 w-3" />
                       </button>
