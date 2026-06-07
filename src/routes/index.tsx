@@ -147,11 +147,47 @@ function Studio() {
           </div>
         </main>
 
+        {/* Resize handle */}
+        <div
+          onMouseDown={() => {
+            draggingRef.current = true;
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+          }}
+          className="w-1 cursor-col-resize bg-border hover:bg-primary/60 transition-colors relative group"
+        >
+          <div className="absolute inset-y-0 -left-1 -right-1" />
+        </div>
+
         {/* Right: AI chat */}
-        <aside className="w-[380px] bg-panel border-l border-border flex flex-col min-h-0">
-          <div className="h-10 px-3 flex items-center justify-between border-b border-border">
-            <span className="text-sm font-medium">Assistant</span>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">online</span>
+        <aside style={{ width: chatWidth }} className="bg-panel border-l border-border flex flex-col min-h-0 shrink-0">
+          <div className="h-11 px-2 flex items-center justify-between border-b border-border gap-1">
+            <div className="flex items-center gap-1">
+              <button title="Chat history" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
+                <History className="h-4 w-4" />
+              </button>
+              <button className="h-8 px-2 flex items-center gap-1.5 rounded-md text-sm hover:bg-accent text-foreground/90">
+                <span className="truncate max-w-[140px]">Untitled chat</span>
+                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+              </button>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <button title="New chat" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
+                <MessageSquarePlus className="h-4 w-4" />
+              </button>
+              <button title="More" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+              <button title="Hide panel" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
+                <PanelRightClose className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <div className="px-3 py-1.5 border-b border-border flex items-center justify-between text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Connected
+            </span>
+            <span>{messages.length} message{messages.length === 1 ? "" : "s"}</span>
           </div>
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
