@@ -793,6 +793,18 @@ function Studio() {
                     </div>
                   </div>
                 ))}
+                {isThinking && (
+                  <div className="flex justify-start">
+                    <div className="rounded-2xl rounded-bl-sm bg-accent px-3.5 py-2 text-sm text-muted-foreground inline-flex items-center gap-2">
+                      <span className="thinking-shimmer">Thinking</span>
+                      <span className="inline-flex gap-0.5">
+                        <span className="thinking-dot" style={{ animationDelay: "0ms" }}>.</span>
+                        <span className="thinking-dot" style={{ animationDelay: "150ms" }}>.</span>
+                        <span className="thinking-dot" style={{ animationDelay: "300ms" }}>.</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Composer */}
@@ -804,6 +816,12 @@ function Studio() {
                   className="hidden"
                   onChange={onPickFiles}
                 />
+                {previewImage && strokes.length > 0 && (
+                  <div className="mb-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/10 border border-primary/30 text-xs text-foreground">
+                    <Target className="h-3 w-3 text-primary" />
+                    <span>Editing highlighted region — your next message edits only the brushed area.</span>
+                  </div>
+                )}
                 <div className="rounded-xl bg-input/60 border border-border focus-within:border-primary/60 transition-colors">
                   {pendingAttachments.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 p-2 border-b border-border/60">
