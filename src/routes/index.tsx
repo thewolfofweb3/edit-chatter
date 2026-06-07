@@ -348,9 +348,13 @@ function Studio() {
                 {activeTab === "workspace" && (
                   <>
                     <span className="text-muted-foreground/60">/</span>
-                    <span className="group flex items-center gap-1 text-foreground/90 cursor-pointer animate-in fade-in slide-in-from-left-1 duration-200">
-                      untitled-project <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
-                    </span>
+                    <button
+                      title="Rename project"
+                      className="h-7 px-2 flex items-center gap-1.5 rounded-md text-sm hover:bg-accent text-foreground/90 group animate-in fade-in slide-in-from-left-1 duration-200"
+                    >
+                      <span className="truncate">untitled-project</span>
+                      <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 shrink-0" />
+                    </button>
                   </>
                 )}
               </>
