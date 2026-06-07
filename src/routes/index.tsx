@@ -18,10 +18,13 @@ export const Route = createFileRoute("/")({
   component: Studio,
 });
 
-type Msg = { id: number; role: "user" | "ai"; text: string };
+type Attachment = { id: number; name: string; type: string; url?: string };
+type Msg = { id: number; role: "user" | "ai"; text: string; attachments?: Attachment[] };
+type Chat = { id: number; name: string; messages: Msg[]; updatedAt: number };
 type Sel = { x: number; y: number; w: number; h: number };
 type Tool = "move" | "select";
 type Preset = { label: string; w: number; h: number; ratio: string };
+type PanelView = "chat" | "history";
 
 const SIZE_PRESETS: Preset[] = [
   { label: "Landscape · 1920×1080", w: 1920, h: 1080, ratio: "16 / 9" },
@@ -33,16 +36,29 @@ const SIZE_PRESETS: Preset[] = [
 ];
 const FPS_PRESETS = [24, 30, 60];
 
+const WELCOME: Msg = { id: 1, role: "ai", text: "Drop an image or video on the canvas, or just tell me what you want to make. Highlight any area of the preview to ask about just that part." };
+
 function Studio() {
-  const [messages, setMessages] = useState<Msg[]>([
-    { id: 1, role: "ai", text: "Drop an image or video on the canvas, or just tell me what you want to make. Highlight any area of the preview to ask about just that part." },
+  const [chats, setChats] = useState<Chat[]>([
+    { id: 1, name: "Untitled chat", messages: [WELCOME], updatedAt: Date.now() },
   ]);
+  const [currentChatId, setCurrentChatId] = useState<number>(1);
+  const [panelView, setPanelView] = useState<PanelView>("chat");
+  const [panelHidden, setPanelHidden] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [input, setInput] = useState("");
   const [chatWidth, setChatWidth] = useState(380);
   const [tool, setTool] = useState<Tool>("select");
   const [sizeIdx, setSizeIdx] = useState(0);
   const [fps, setFps] = useState(30);
   const [menu, setMenu] = useState<null | "size" | "fps">(null);
+
+  const currentChat = chats.find((c) => c.id === currentChatId) ?? chats[0];
+  const messages = currentChat?.messages ?? [];
 
   const [selection, setSelection] = useState<Sel | null>(null);
   
