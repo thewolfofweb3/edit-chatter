@@ -331,16 +331,31 @@ function Studio() {
       {/* Top bar */}
       <header className="h-10 flex items-center justify-between px-3 border-b border-border bg-panel text-sm">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <div className="h-2.5 w-2.5 rounded-full bg-[oklch(0.65_0.18_25)]" />
-            <div className="h-2.5 w-2.5 rounded-full bg-[oklch(0.78_0.14_85)]" />
-            <div className="h-2.5 w-2.5 rounded-full bg-[oklch(0.7_0.14_150)]" />
-          </div>
-          <button className="text-muted-foreground hover:text-foreground">Projects</button>
-          <span className="text-muted-foreground/60">/</span>
-          <span className="flex items-center gap-1 text-foreground/90">
-            untitled-project <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-          </span>
+          {(() => {
+            const sectionLabels: Record<string, string> = {
+              workspace: "Workspace",
+              projects: "Projects",
+              assets: "Assets",
+              templates: "Templates",
+              tutorials: "Tutorials",
+            };
+            const section = sectionLabels[activeTab] ?? "Workspace";
+            return (
+              <>
+                <button className="text-muted-foreground hover:text-foreground transition-colors">
+                  {section}
+                </button>
+                {activeTab === "workspace" && (
+                  <>
+                    <span className="text-muted-foreground/60">/</span>
+                    <span className="flex items-center gap-1 text-foreground/90 animate-in fade-in slide-in-from-left-1 duration-200">
+                      untitled-project <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                    </span>
+                  </>
+                )}
+              </>
+            );
+          })()}
         </div>
         <div className="flex items-center gap-2">
           <button className="px-2.5 py-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground flex items-center gap-1.5">
