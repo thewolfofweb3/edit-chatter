@@ -321,7 +321,8 @@ function Studio() {
       });
       const data = await r.json();
       if (!r.ok || !data.dataUrl) {
-        pushMessage("ai", `⚠️ ${data.error || "Image generation failed"}`);
+        const detail = data.text ? ` — model said: "${data.text.trim()}"` : "";
+        pushMessage("ai", `⚠️ ${data.error || "Image generation failed"}${detail}\n\nTip: image models often refuse copyrighted characters (e.g. Bart Simpson, Iron Man). Try a descriptive prompt instead.`);
         return;
       }
 
