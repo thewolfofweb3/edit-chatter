@@ -127,10 +127,7 @@ function Studio() {
         {/* Right: AI chat */}
         <aside className="w-[380px] bg-panel border-l border-border flex flex-col min-h-0">
           <div className="h-10 px-3 flex items-center justify-between border-b border-border">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">AI Assistant</span>
-            </div>
+            <span className="text-sm font-medium">Assistant</span>
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">online</span>
           </div>
 
