@@ -51,6 +51,18 @@ function Studio() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const plusRef = useRef<HTMLDivElement>(null);
+  const [mode, setMode] = useState<"build" | "plan">("build");
+  const [modeOpen, setModeOpen] = useState(false);
+  const modeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!modeOpen) return;
+    function onDown(e: MouseEvent) {
+      if (modeRef.current && !modeRef.current.contains(e.target as Node)) setModeOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [modeOpen]);
 
   useEffect(() => {
     if (!plusOpen) return;
