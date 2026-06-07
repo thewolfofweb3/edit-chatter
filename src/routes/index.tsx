@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import {
   Image as ImageIcon, Film, Layers, Wand2, Settings,
-  Folder, Download, Upload, Send, Plus, Scissors,
+  Folder, Download, Upload, Send, Scissors,
   Type, Music, Maximize2, ChevronDown, MessageSquarePlus,
   PanelRightClose, History, MoreHorizontal, Paperclip,
 } from "lucide-react";
