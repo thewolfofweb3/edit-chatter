@@ -240,7 +240,8 @@ function Studio() {
               onMouseMove={onCanvasMove}
               onMouseUp={onCanvasUp}
               onMouseLeave={() => setDrawing(null)}
-              className={`relative aspect-video w-full max-w-6xl max-h-full rounded-lg overflow-hidden border border-border shadow-2xl bg-[oklch(0.08_0.003_270)] select-none ${cursorClass}`}
+              style={{ aspectRatio: SIZE_PRESETS[sizeIdx].ratio }}
+              className={`relative w-full max-w-6xl max-h-full rounded-lg overflow-hidden border border-border shadow-2xl bg-[oklch(0.08_0.003_270)] select-none ${cursorClass}`}
             >
               <div className="absolute inset-0 grid place-items-center text-center px-6 pointer-events-none">
                 <div>
@@ -259,9 +260,55 @@ function Studio() {
               )}
             </div>
 
-            <div className="absolute bottom-4 right-6 text-[11px] text-muted-foreground/70">
-              1920 × 1080 · 30fps
+            {/* Canvas settings */}
+            <div className="absolute bottom-4 right-6 flex items-center gap-1 text-[11px]">
+              <div className="relative">
+                <button
+                  onClick={() => setMenu(menu === "size" ? null : "size")}
+                  className="px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 flex items-center gap-1"
+                >
+                  {SIZE_PRESETS[sizeIdx].w} × {SIZE_PRESETS[sizeIdx].h}
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+                {menu === "size" && (
+                  <div className="absolute bottom-full right-0 mb-1 w-56 rounded-md border border-border bg-panel shadow-lg py-1 z-20">
+                    {SIZE_PRESETS.map((p, i) => (
+                      <button
+                        key={p.label}
+                        onClick={() => { setSizeIdx(i); setMenu(null); }}
+                        className={`w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent ${i === sizeIdx ? "text-foreground" : "text-muted-foreground"}`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="text-muted-foreground/50">·</span>
+              <div className="relative">
+                <button
+                  onClick={() => setMenu(menu === "fps" ? null : "fps")}
+                  className="px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 flex items-center gap-1"
+                >
+                  {fps}fps
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+                {menu === "fps" && (
+                  <div className="absolute bottom-full right-0 mb-1 w-32 rounded-md border border-border bg-panel shadow-lg py-1 z-20">
+                    {FPS_PRESETS.map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => { setFps(f); setMenu(null); }}
+                        className={`w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent ${f === fps ? "text-foreground" : "text-muted-foreground"}`}
+                      >
+                        {f} fps
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
+
           </div>
         </main>
 
