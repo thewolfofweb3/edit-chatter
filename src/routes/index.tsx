@@ -23,7 +23,7 @@ function Studio() {
     { id: 1, role: "ai", text: "Hey — drop an image or video on the canvas, or just tell me what you want to make." },
   ]);
   const [input, setInput] = useState("");
-  const [playing, setPlaying] = useState(false);
+  
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
