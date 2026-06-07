@@ -202,12 +202,23 @@ function Studio() {
 
   function newChat() {
     const id = Date.now();
-    setChats((cs) => [{ id, name: "Untitled chat", messages: [WELCOME], updatedAt: Date.now() }, ...cs]);
+    setChats((cs) => {
+      const existing = new Set(cs.map((c) => c.name));
+      let name = "Untitled chat";
+      let n = 2;
+      while (existing.has(name)) name = `Untitled chat ${n++}`;
+      return [{ id, name, messages: [WELCOME], updatedAt: Date.now() }, ...cs];
+    });
     setCurrentChatId(id);
     setPanelView("chat");
     setInput("");
     setPendingAttachments([]);
+    setRenaming(false);
+    setPlusOpen(false);
+    setMenu(null);
+    setTimeout(() => composerRef.current?.focus(), 0);
   }
+
 
   function openChat(id: number) {
     setCurrentChatId(id);
