@@ -44,7 +44,7 @@ function Studio() {
   ]);
   const [currentChatId, setCurrentChatId] = useState<number>(1);
   const [panelView, setPanelView] = useState<PanelView>("chat");
-  const [panelHidden, setPanelHidden] = useState(false);
+  
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
