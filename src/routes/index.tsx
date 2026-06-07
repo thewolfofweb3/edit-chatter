@@ -20,6 +20,17 @@ export const Route = createFileRoute("/")({
 type Msg = { id: number; role: "user" | "ai"; text: string };
 type Sel = { x: number; y: number; w: number; h: number };
 type Tool = "move" | "select";
+type Preset = { label: string; w: number; h: number; ratio: string };
+
+const SIZE_PRESETS: Preset[] = [
+  { label: "Landscape · 1920×1080", w: 1920, h: 1080, ratio: "16 / 9" },
+  { label: "Portrait · 1080×1920", w: 1080, h: 1920, ratio: "9 / 16" },
+  { label: "Square · 1080×1080", w: 1080, h: 1080, ratio: "1 / 1" },
+  { label: "Vertical 4:5 · 1080×1350", w: 1080, h: 1350, ratio: "4 / 5" },
+  { label: "Cinema 21:9 · 2560×1080", w: 2560, h: 1080, ratio: "21 / 9" },
+  { label: "4K · 3840×2160", w: 3840, h: 2160, ratio: "16 / 9" },
+];
+const FPS_PRESETS = [24, 30, 60];
 
 function Studio() {
   const [messages, setMessages] = useState<Msg[]>([
@@ -28,6 +39,10 @@ function Studio() {
   const [input, setInput] = useState("");
   const [chatWidth, setChatWidth] = useState(380);
   const [tool, setTool] = useState<Tool>("select");
+  const [sizeIdx, setSizeIdx] = useState(0);
+  const [fps, setFps] = useState(30);
+  const [menu, setMenu] = useState<null | "size" | "fps">(null);
+
   const [selection, setSelection] = useState<Sel | null>(null);
   
   const [drawing, setDrawing] = useState<{ x: number; y: number } | null>(null);
