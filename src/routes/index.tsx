@@ -17,9 +17,9 @@ export const Route = createFileRoute("/")({
   component: Studio,
 });
 
-type Msg = { id: number; role: "user" | "ai"; text: string; selection?: Sel };
+type Msg = { id: number; role: "user" | "ai"; text: string };
 type Sel = { x: number; y: number; w: number; h: number };
-type Tool = "move" | "select" | "hand";
+type Tool = "move" | "select";
 
 function Studio() {
   const [messages, setMessages] = useState<Msg[]>([
