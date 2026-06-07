@@ -1,29 +1,253 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState, useRef, useEffect } from "react";
+import {
+  Sparkles, Image as ImageIcon, Film, Layers, Wand2, Settings,
+  Folder, Play, Pause, Download, Upload, Send, Plus, Scissors,
+  Type, Music, Maximize2, ChevronDown,
+} from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+      { title: "Reel — AI Video Studio" },
+      { name: "description", content: "An AI video & image studio. Chat to create, edit, and refine." },
     ],
   }),
-  component: Index,
+  component: Studio,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+type Msg = { id: number; role: "user" | "ai"; text: string };
+
+function Studio() {
+  const [messages, setMessages] = useState<Msg[]>([
+    { id: 1, role: "ai", text: "Hey — drop an image or video on the canvas, or just tell me what you want to make." },
+  ]);
+  const [input, setInput] = useState("");
+  const [playing, setPlaying] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
+
+  function send() {
+    const t = input.trim();
+    if (!t) return;
+    const id = Date.now();
+    setMessages((m) => [...m, { id, role: "user", text: t }]);
+    setInput("");
+    setTimeout(() => {
+      setMessages((m) => [
+        ...m,
+        { id: id + 1, role: "ai", text: "Got it — working on that. (Hook this up to your model on the backend.)" },
+      ]);
+    }, 600);
+  }
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden">
+      {/* Top bar */}
+      <header className="h-10 flex items-center justify-between px-3 border-b border-border bg-panel text-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <div className="h-2.5 w-2.5 rounded-full bg-[oklch(0.65_0.18_25)]" />
+            <div className="h-2.5 w-2.5 rounded-full bg-[oklch(0.78_0.14_85)]" />
+            <div className="h-2.5 w-2.5 rounded-full bg-[oklch(0.7_0.14_150)]" />
+          </div>
+          <span className="text-muted-foreground">Reel Studio</span>
+          <span className="text-muted-foreground/60">/</span>
+          <span className="flex items-center gap-1 text-foreground/90">
+            untitled-project <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="px-2.5 py-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground flex items-center gap-1.5">
+            <Upload className="h-3.5 w-3.5" /> Import
+          </button>
+          <button className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-1.5 font-medium">
+            <Download className="h-3.5 w-3.5" /> Export
+          </button>
+        </div>
+      </header>
+
+      <div className="flex-1 flex min-h-0">
+        {/* Left icon rail */}
+        <aside className="w-12 bg-rail border-r border-border flex flex-col items-center py-2 gap-1">
+          {[
+            { Icon: Sparkles, active: true, label: "Generate" },
+            { Icon: ImageIcon, label: "Images" },
+            { Icon: Film, label: "Clips" },
+            { Icon: Layers, label: "Layers" },
+            { Icon: Folder, label: "Assets" },
+            { Icon: Wand2, label: "Effects" },
+          ].map(({ Icon, active, label }) => (
+            <button
+              key={label}
+              title={label}
+              className={`h-9 w-9 grid place-items-center rounded-md transition-colors ${
+                active
+                  ? "bg-accent text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+              }`}
+            >
+              <Icon className="h-[18px] w-[18px]" />
+            </button>
+          ))}
+          <div className="flex-1" />
+          <button className="h-9 w-9 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60">
+            <Settings className="h-[18px] w-[18px]" />
+          </button>
+        </aside>
+
+        {/* Workspace */}
+        <main className="flex-1 flex flex-col min-w-0 bg-canvas">
+          {/* Canvas toolbar */}
+          <div className="h-9 px-3 flex items-center gap-1 border-b border-border bg-panel/60 text-xs text-muted-foreground">
+            <button className="px-2 py-1 rounded hover:bg-accent hover:text-foreground flex items-center gap-1"><Scissors className="h-3.5 w-3.5" /> Cut</button>
+            <button className="px-2 py-1 rounded hover:bg-accent hover:text-foreground flex items-center gap-1"><Type className="h-3.5 w-3.5" /> Text</button>
+            <button className="px-2 py-1 rounded hover:bg-accent hover:text-foreground flex items-center gap-1"><Music className="h-3.5 w-3.5" /> Audio</button>
+            <button className="px-2 py-1 rounded hover:bg-accent hover:text-foreground flex items-center gap-1"><Wand2 className="h-3.5 w-3.5" /> Effects</button>
+            <div className="flex-1" />
+            <span>1920 × 1080 · 30fps</span>
+            <button className="ml-2 p-1 rounded hover:bg-accent hover:text-foreground"><Maximize2 className="h-3.5 w-3.5" /></button>
+          </div>
+
+          {/* Preview */}
+          <div className="flex-1 flex items-center justify-center p-6 min-h-0">
+            <div className="relative aspect-video w-full max-w-5xl max-h-full rounded-lg overflow-hidden border border-border shadow-2xl bg-[oklch(0.08_0.003_270)]">
+              <div
+                className="absolute inset-0 opacity-60"
+                style={{
+                  background:
+                    "radial-gradient(ellipse at 30% 30%, oklch(0.35 0.12 30 / 0.5), transparent 60%), radial-gradient(ellipse at 70% 70%, oklch(0.32 0.1 260 / 0.5), transparent 60%)",
+                }}
+              />
+              <div className="absolute inset-0 grid place-items-center text-center px-6">
+                <div>
+                  <div className="mx-auto h-14 w-14 rounded-full bg-primary/15 grid place-items-center mb-3 border border-primary/30">
+                    <Sparkles className="h-6 w-6 text-primary" />
+                  </div>
+                  <p className="text-foreground/90 text-lg font-medium">Your video/image preview lives here</p>
+                  <p className="text-muted-foreground text-sm mt-1">Drop a file, or ask the AI on the right to make something.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Transport / timeline */}
+          <div className="border-t border-border bg-panel">
+            <div className="h-10 px-3 flex items-center gap-3 border-b border-border">
+              <button
+                onClick={() => setPlaying((p) => !p)}
+                className="h-7 w-7 grid place-items-center rounded-md bg-accent hover:bg-accent/80 text-foreground"
+              >
+                {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+              </button>
+              <span className="font-mono text-xs text-muted-foreground tabular-nums">00:00:00 / 00:00:12</span>
+              <div className="flex-1" />
+              <button className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                <Plus className="h-3.5 w-3.5" /> Add track
+              </button>
+            </div>
+            <div className="px-3 py-2 space-y-1.5">
+              {[
+                { name: "V1", color: "oklch(0.55 0.14 30)", w: "70%", l: "0%" },
+                { name: "V2", color: "oklch(0.5 0.12 260)", w: "40%", l: "30%" },
+                { name: "A1", color: "oklch(0.55 0.13 160)", w: "85%", l: "5%" },
+              ].map((t) => (
+                <div key={t.name} className="flex items-center gap-2">
+                  <span className="w-6 text-[10px] font-mono text-muted-foreground">{t.name}</span>
+                  <div className="relative flex-1 h-7 rounded bg-[oklch(0.16_0.004_270)] overflow-hidden">
+                    <div
+                      className="absolute top-0 bottom-0 rounded opacity-90"
+                      style={{ background: t.color, width: t.w, left: t.l }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
+
+        {/* Right: AI chat */}
+        <aside className="w-[380px] bg-panel border-l border-border flex flex-col min-h-0">
+          <div className="h-10 px-3 flex items-center justify-between border-b border-border">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">AI Assistant</span>
+            </div>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">online</span>
+          </div>
+
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
+            {messages.map((m) => (
+              <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                    m.role === "user"
+                      ? "bg-primary text-primary-foreground rounded-br-sm"
+                      : "bg-accent text-foreground rounded-bl-sm"
+                  }`}
+                >
+                  {m.text}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Suggestions */}
+          <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+            {["Make it cinematic", "Add captions", "Cut silences", "Color grade"].map((s) => (
+              <button
+                key={s}
+                onClick={() => setInput(s)}
+                className="text-xs px-2 py-1 rounded-full bg-accent/60 hover:bg-accent text-muted-foreground hover:text-foreground border border-border"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          {/* Composer */}
+          <div className="p-3 border-t border-border">
+            <div className="rounded-xl bg-input/60 border border-border focus-within:border-primary/60 transition-colors">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
+                rows={2}
+                placeholder="Type here — ask the AI to edit, generate, or refine…"
+                className="w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+              />
+              <div className="flex items-center justify-between px-2 pb-2">
+                <button className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent" title="Attach">
+                  <Plus className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={send}
+                  className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40"
+                  disabled={!input.trim()}
+                >
+                  Send <Send className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {/* Status bar */}
+      <footer className="h-6 border-t border-border bg-rail text-[11px] text-muted-foreground flex items-center px-3 gap-4">
+        <span>● Ready</span>
+        <span>Project: untitled-project</span>
+        <div className="flex-1" />
+        <span>v0.1</span>
+      </footer>
     </div>
   );
 }
