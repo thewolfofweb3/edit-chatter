@@ -566,14 +566,23 @@ function Studio() {
               style={{ aspectRatio: SIZE_PRESETS[sizeIdx].ratio }}
               className={`relative w-full max-w-6xl max-h-full rounded-lg overflow-hidden border border-border shadow-2xl bg-[oklch(0.08_0.003_270)] select-none ${cursorClass}`}
             >
-              <div className="absolute inset-0 grid place-items-center text-center px-6 pointer-events-none">
-                <div>
-                  <p className="text-foreground/80 text-base font-medium">Preview</p>
-                  <p className="text-muted-foreground text-sm mt-1">
-                    Your image or video will appear here. Use the highlight tool to ask about a specific area.
-                  </p>
+              {previewImage ? (
+                <img
+                  src={previewImage}
+                  alt="Preview"
+                  draggable={false}
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+                />
+              ) : (
+                <div className="absolute inset-0 grid place-items-center text-center px-6 pointer-events-none">
+                  <div>
+                    <p className="text-foreground/80 text-base font-medium">Preview</p>
+                    <p className="text-muted-foreground text-sm mt-1">
+                      Ask the AI to generate an image. Then use the brush to highlight what to change.
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {selection && (
                 <div
