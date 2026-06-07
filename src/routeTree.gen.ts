@@ -9,40 +9,48 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ApiRouteRouteImport } from './routes/api/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiOrchestrateRouteImport } from './routes/api/orchestrate'
 import { Route as ApiImageRouteImport } from './routes/api/image'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
+const ApiRouteRoute = ApiRouteRouteImport.update({
+  id: '/api',
+  path: '/api',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOrchestrateRoute = ApiOrchestrateRouteImport.update({
-  id: '/api/orchestrate',
-  path: '/api/orchestrate',
-  getParentRoute: () => rootRouteImport,
+  id: '/orchestrate',
+  path: '/orchestrate',
+  getParentRoute: () => ApiRouteRoute,
 } as any)
 const ApiImageRoute = ApiImageRouteImport.update({
-  id: '/api/image',
-  path: '/api/image',
-  getParentRoute: () => rootRouteImport,
+  id: '/image',
+  path: '/image',
+  getParentRoute: () => ApiRouteRoute,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
-  id: '/api/chat',
-  path: '/api/chat',
-  getParentRoute: () => rootRouteImport,
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => ApiRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api': typeof ApiRouteRouteWithChildren
   '/api/chat': typeof ApiChatRoute
   '/api/image': typeof ApiImageRoute
   '/api/orchestrate': typeof ApiOrchestrateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api': typeof ApiRouteRouteWithChildren
   '/api/chat': typeof ApiChatRoute
   '/api/image': typeof ApiImageRoute
   '/api/orchestrate': typeof ApiOrchestrateRoute
@@ -50,27 +58,39 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api': typeof ApiRouteRouteWithChildren
   '/api/chat': typeof ApiChatRoute
   '/api/image': typeof ApiImageRoute
   '/api/orchestrate': typeof ApiOrchestrateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/chat' | '/api/image' | '/api/orchestrate'
+  fullPaths: '/' | '/api' | '/api/chat' | '/api/image' | '/api/orchestrate'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/chat' | '/api/image' | '/api/orchestrate'
-  id: '__root__' | '/' | '/api/chat' | '/api/image' | '/api/orchestrate'
+  to: '/' | '/api' | '/api/chat' | '/api/image' | '/api/orchestrate'
+  id:
+    | '__root__'
+    | '/'
+    | '/api'
+    | '/api/chat'
+    | '/api/image'
+    | '/api/orchestrate'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ApiChatRoute: typeof ApiChatRoute
-  ApiImageRoute: typeof ApiImageRoute
-  ApiOrchestrateRoute: typeof ApiOrchestrateRoute
+  ApiRouteRoute: typeof ApiRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/api': {
+      id: '/api'
+      path: '/api'
+      fullPath: '/api'
+      preLoaderRoute: typeof ApiRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -80,34 +100,58 @@ declare module '@tanstack/react-router' {
     }
     '/api/orchestrate': {
       id: '/api/orchestrate'
-      path: '/api/orchestrate'
+      path: '/orchestrate'
       fullPath: '/api/orchestrate'
       preLoaderRoute: typeof ApiOrchestrateRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiRouteRoute
     }
     '/api/image': {
       id: '/api/image'
-      path: '/api/image'
+      path: '/image'
       fullPath: '/api/image'
       preLoaderRoute: typeof ApiImageRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiRouteRoute
     }
     '/api/chat': {
       id: '/api/chat'
-      path: '/api/chat'
+      path: '/chat'
       fullPath: '/api/chat'
       preLoaderRoute: typeof ApiChatRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiRouteRoute
     }
   }
 }
 
-const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+interface ApiRouteRouteChildren {
+  ApiChatRoute: typeof ApiChatRoute
+  ApiImageRoute: typeof ApiImageRoute
+  ApiOrchestrateRoute: typeof ApiOrchestrateRoute
+}
+
+const ApiRouteRouteChildren: ApiRouteRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiImageRoute: ApiImageRoute,
   ApiOrchestrateRoute: ApiOrchestrateRoute,
 }
+
+const ApiRouteRouteWithChildren = ApiRouteRoute._addFileChildren(
+  ApiRouteRouteChildren,
+)
+
+const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
+  ApiRouteRoute: ApiRouteRouteWithChildren,
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
