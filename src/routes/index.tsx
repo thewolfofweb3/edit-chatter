@@ -51,6 +51,9 @@ function Studio() {
   
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [projectName, setProjectName] = useState("untitled-project");
+  const [projectRenaming, setProjectRenaming] = useState(false);
+  const [projectRenameValue, setProjectRenameValue] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [plusOpen, setPlusOpen] = useState(false);
