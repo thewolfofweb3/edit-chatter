@@ -237,7 +237,7 @@ function Studio() {
               />
               <div className="flex items-center justify-between px-2 pb-2">
                 <button className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent" title="Attach">
-                  <Plus className="h-4 w-4" />
+                  <Paperclip className="h-4 w-4" />
                 </button>
                 <button
                   onClick={send}
