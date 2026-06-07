@@ -93,7 +93,7 @@ function Studio() {
         </div>
       </header>
 
-      <div className="flex-1 flex min-h-0">
+      <div ref={shellRef} className="flex-1 flex min-h-0">
         {/* Left icon rail */}
         <aside className="w-12 bg-rail border-r border-border flex flex-col items-center py-2 gap-1">
           {[
