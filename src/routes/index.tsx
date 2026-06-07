@@ -63,6 +63,7 @@ function Studio() {
 
   const [input, setInput] = useState("");
   const [chatWidth, setChatWidth] = useState(380);
+  const [shellWidth, setShellWidth] = useState(0);
   const [tool, setTool] = useState<Tool>("select");
   const [sizeIdx, setSizeIdx] = useState(0);
   const [fps, setFps] = useState(30);
@@ -119,8 +120,27 @@ function Studio() {
     function onMove(e: MouseEvent) {
       if (!draggingRef.current || !shellRef.current) return;
       const rect = shellRef.current.getBoundingClientRect();
-      const next = rect.right - e.clientX;
-      setChatWidth(Math.max(0, Math.min(rect.width, next)));
+      // Available space for chat (rail = 48px, handle = 4px)
+      const available = Math.max(0, rect.width - 48 - 4);
+      const raw = rect.right - e.clientX;
+      const MIN_CHAT = 280;
+      const MIN_PREVIEW = 320;
+      const SNAP_CLOSE = 140;
+      let next = Math.max(0, Math.min(available, raw));
+      // Snap chat closed when dragged past the close threshold
+      if (raw < SNAP_CLOSE) {
+        next = 0;
+      } else if (raw < MIN_CHAT) {
+        // Resist at minimum chat width
+        next = MIN_CHAT;
+      } else if (available - raw < SNAP_CLOSE) {
+        // Snap preview closed (chat takes full width)
+        next = available;
+      } else if (available - raw < MIN_PREVIEW) {
+        // Resist at minimum preview width
+        next = available - MIN_PREVIEW;
+      }
+      setChatWidth(next);
     }
     function onUp() {
       draggingRef.current = false;
@@ -134,6 +154,22 @@ function Studio() {
       window.removeEventListener("mouseup", onUp);
     };
   }, []);
+
+  // Track shell width so we can hide overlay controls when the preview collapses
+  useEffect(() => {
+    if (!shellRef.current) return;
+    const el = shellRef.current;
+    const update = () => setShellWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const previewWidth = Math.max(0, shellWidth - 48 - 4 - chatWidth);
+  const previewCollapsed = shellWidth > 0 && previewWidth < 240;
+
+
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -298,8 +334,11 @@ function Studio() {
         </aside>
 
         {/* Workspace */}
-        <main className="flex-1 flex flex-col min-w-0 bg-canvas">
+        <main className="flex-1 flex flex-col min-w-0 bg-canvas overflow-hidden">
           <div className="relative flex-1 flex flex-col items-center justify-center p-6 pb-4 min-h-0 gap-3">
+            {previewCollapsed ? null : (
+            <>
+
             {/* Floating tool dock */}
             <div
               onMouseDown={(e) => {
@@ -402,8 +441,11 @@ function Studio() {
                 )}
               </div>
             </div>
+            </>
+            )}
           </div>
         </main>
+
 
         {/* Resize handle */}
         <div
