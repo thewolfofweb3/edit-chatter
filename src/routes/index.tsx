@@ -205,8 +205,8 @@ function Studio() {
 
         {/* Workspace */}
         <main className="flex-1 flex flex-col min-w-0 bg-canvas">
-          {/* Floating tool dock */}
-          <div className="relative flex-1 flex items-center justify-center p-6 min-h-0">
+          <div className="relative flex-1 flex flex-col items-center justify-center p-6 pb-4 min-h-0 gap-3">
+            {/* Floating tool dock */}
             <div
               onMouseDown={(e) => {
                 dockPressRef.current = { mx: e.clientX, my: e.clientY, ox: dockPos.x, oy: dockPos.y, moved: false };
@@ -260,8 +260,8 @@ function Studio() {
               )}
             </div>
 
-            {/* Canvas settings */}
-            <div className="absolute bottom-4 right-6 flex items-center gap-1 text-[11px]">
+            {/* Canvas settings toolbar */}
+            <div className="flex items-center gap-1 text-[11px] shrink-0">
               <div className="relative">
                 <button
                   onClick={() => setMenu(menu === "size" ? null : "size")}
@@ -308,7 +308,6 @@ function Studio() {
                 )}
               </div>
             </div>
-
           </div>
         </main>
 
