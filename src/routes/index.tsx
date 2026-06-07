@@ -292,14 +292,6 @@ function Studio() {
                       : "bg-accent text-foreground rounded-bl-sm"
                   }`}
                 >
-                  {m.selection && (
-                    <div className={`mb-1.5 inline-flex items-center gap-1.5 text-[11px] px-1.5 py-0.5 rounded ${
-                      m.role === "user" ? "bg-primary-foreground/15" : "bg-foreground/10"
-                    }`}>
-                      <SquareDashedMousePointer className="h-3 w-3" />
-                      highlighted area
-                    </div>
-                  )}
                   {m.text && <div>{m.text}</div>}
                 </div>
               </div>
