@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Image as ImageIcon, Film, Layers, Wand2, Settings,
   Folder, Download, Upload, Send, ChevronDown,
-  MessageSquarePlus, PanelRightClose, PanelRightOpen, History, Paperclip,
+  MessageSquarePlus, History, Paperclip,
   SquareDashedMousePointer, MousePointer2, Plus,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
 } from "lucide-react";
