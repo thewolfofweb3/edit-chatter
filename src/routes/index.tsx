@@ -6,7 +6,7 @@ import {
   MessageSquarePlus, History, Paperclip,
   SquareDashedMousePointer, MousePointer2, Plus,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
-  LayoutGrid, Library, Sparkles, Clock, Save,
+  LayoutGrid, Library, Sparkles, Clock, Save, LayoutTemplate, GraduationCap,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -346,8 +346,8 @@ function Studio() {
             { id: "workspace", Icon: LayoutGrid, label: "Workspace" },
             { id: "projects", Icon: Folder, label: "Projects" },
             { id: "assets", Icon: Library, label: "Assets" },
-            { id: "templates", Icon: Sparkles, label: "Templates" },
-            { id: "history", Icon: Clock, label: "History" },
+            { id: "templates", Icon: LayoutTemplate, label: "Templates" },
+            { id: "tutorials", Icon: GraduationCap, label: "Tutorials" },
           ].map(({ id, Icon, label }) => (
             <button
               key={id}
