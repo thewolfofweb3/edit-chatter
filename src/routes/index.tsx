@@ -437,8 +437,11 @@ function Studio() {
                 )}
               </div>
             </div>
+            </>
+            )}
           </div>
         </main>
+
 
         {/* Resize handle */}
         <div
