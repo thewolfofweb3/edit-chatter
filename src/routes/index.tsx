@@ -97,11 +97,10 @@ function Studio() {
 
   function send() {
     const t = input.trim();
-    if (!t && !pendingSel) return;
+    if (!t) return;
     const id = Date.now();
-    setMessages((m) => [...m, { id, role: "user", text: t, selection: pendingSel ?? undefined }]);
+    setMessages((m) => [...m, { id, role: "user", text: t }]);
     setInput("");
-    setPendingSel(null);
     setTimeout(() => {
       setMessages((m) => [
         ...m,
@@ -129,15 +128,13 @@ function Studio() {
     });
   }
   function onCanvasUp() {
-    if (drawing && selection && selection.w > 8 && selection.h > 8) {
-      setPendingSel(selection);
-      setTimeout(() => composerRef.current?.focus(), 0);
+    if (drawing && selection && (selection.w < 8 || selection.h < 8)) {
+      setSelection(null);
     }
     setDrawing(null);
   }
 
-  const cursorClass =
-    tool === "select" ? "cursor-crosshair" : tool === "hand" ? "cursor-grab" : "cursor-default";
+  const cursorClass = tool === "select" ? "cursor-crosshair" : "cursor-default";
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden">
