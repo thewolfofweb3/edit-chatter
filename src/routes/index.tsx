@@ -459,9 +459,6 @@ function Studio() {
               <button onClick={newChat} title="New chat" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
                 <MessageSquarePlus className="h-4 w-4" />
               </button>
-              <button onClick={() => setPanelHidden(true)} title="Hide panel" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
-                <PanelRightClose className="h-4 w-4" />
-              </button>
             </div>
           </div>
 
