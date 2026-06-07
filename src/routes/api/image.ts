@@ -68,7 +68,7 @@ export const Route = createFileRoute("/api/image")({
             "X-Title": "Reel Studio",
           },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash-image-preview",
+            model: "google/gemini-2.5-flash-image",
             modalities: ["image", "text"],
             messages: [{ role: "user", content: userContent }],
           }),
