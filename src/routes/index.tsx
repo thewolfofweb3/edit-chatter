@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Image as ImageIcon, Film, Layers, Wand2, Settings,
   Folder, Download, Upload, Send, ChevronDown,
-  MessageSquarePlus, PanelRightClose, PanelRightOpen, History, Paperclip,
+  MessageSquarePlus, History, Paperclip,
   SquareDashedMousePointer, MousePointer2, Plus,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
 } from "lucide-react";
@@ -44,7 +44,7 @@ function Studio() {
   ]);
   const [currentChatId, setCurrentChatId] = useState<number>(1);
   const [panelView, setPanelView] = useState<PanelView>("chat");
-  const [panelHidden, setPanelHidden] = useState(false);
+  
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
@@ -119,7 +119,8 @@ function Studio() {
     function onMove(e: MouseEvent) {
       if (!draggingRef.current || !shellRef.current) return;
       const rect = shellRef.current.getBoundingClientRect();
-      setChatWidth(Math.min(640, Math.max(280, rect.right - e.clientX)));
+      const next = rect.right - e.clientX;
+      setChatWidth(Math.max(0, Math.min(rect.width, next)));
     }
     function onUp() {
       draggingRef.current = false;
@@ -405,28 +406,17 @@ function Studio() {
         </main>
 
         {/* Resize handle */}
-        {!panelHidden && (
-          <div
-            onMouseDown={() => {
-              draggingRef.current = true;
-              document.body.style.cursor = "col-resize";
-              document.body.style.userSelect = "none";
-            }}
-            className="w-1 cursor-col-resize bg-border hover:bg-primary/60 transition-colors"
-          />
-        )}
+        <div
+          onMouseDown={() => {
+            draggingRef.current = true;
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+          }}
+          className="w-1 cursor-col-resize bg-border hover:bg-primary/60 transition-colors shrink-0"
+        />
 
         {/* Right: AI chat */}
-        {panelHidden ? (
-          <button
-            onClick={() => setPanelHidden(false)}
-            title="Show chat"
-            className="absolute top-12 right-2 z-20 h-9 w-9 grid place-items-center rounded-md bg-panel/90 border border-border backdrop-blur shadow text-muted-foreground hover:text-foreground hover:bg-accent"
-          >
-            <PanelRightOpen className="h-4 w-4" />
-          </button>
-        ) : (
-        <aside style={{ width: chatWidth }} className="bg-panel border-l border-border flex flex-col min-h-0 shrink-0">
+        <aside style={{ width: chatWidth }} className="bg-panel border-l border-border flex flex-col min-h-0 shrink-0 overflow-hidden">
           <div className="h-11 px-2 flex items-center justify-between border-b border-border gap-1">
             <div className="flex items-center gap-1 min-w-0">
               <button
@@ -468,9 +458,6 @@ function Studio() {
             <div className="flex items-center gap-0.5 shrink-0">
               <button onClick={newChat} title="New chat" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
                 <MessageSquarePlus className="h-4 w-4" />
-              </button>
-              <button onClick={() => setPanelHidden(true)} title="Hide panel" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
-                <PanelRightClose className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -617,7 +604,7 @@ function Studio() {
             </>
           )}
         </aside>
-        )}
+
       </div>
 
 
