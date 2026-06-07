@@ -917,7 +917,7 @@ function Studio() {
                       <button
                         onClick={send}
                         className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40"
-                        disabled={!input.trim() && pendingAttachments.length === 0}
+                        disabled={isThinking || (!input.trim() && pendingAttachments.length === 0)}
                       >
                         Send <Send className="h-3 w-3" />
                       </button>
