@@ -38,6 +38,40 @@ function Studio() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
+  // Tool dock dragging
+  const [dockPos, setDockPos] = useState({ x: 0, y: 0 });
+  const [dockDragging, setDockDragging] = useState(false);
+  const dockPressRef = useRef<{ mx: number; my: number; ox: number; oy: number; moved: boolean } | null>(null);
+  const dockSuppressClickRef = useRef(false);
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      const p = dockPressRef.current;
+      if (!p) return;
+      const dx = e.clientX - p.mx;
+      const dy = e.clientY - p.my;
+      if (!p.moved && Math.hypot(dx, dy) < 4) return;
+      p.moved = true;
+      dockSuppressClickRef.current = true;
+      setDockDragging(true);
+      setDockPos({ x: p.ox + dx, y: p.oy + dy });
+    }
+    function onUp() {
+      if (dockPressRef.current) {
+        dockPressRef.current = null;
+        setDockDragging(false);
+        // clear suppression after the click event has fired
+        setTimeout(() => { dockSuppressClickRef.current = false; }, 0);
+      }
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
   useEffect(() => {
     function onMove(e: MouseEvent) {
       if (!draggingRef.current || !shellRef.current) return;
