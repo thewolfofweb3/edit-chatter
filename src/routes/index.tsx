@@ -4,7 +4,7 @@ import {
   Image as ImageIcon, Film, Layers, Wand2, Settings,
   Folder, Download, Upload, Send, ChevronDown,
   MessageSquarePlus, PanelRightClose, PanelRightOpen, History, Paperclip,
-  SquareDashedMousePointer, MousePointer2,
+  SquareDashedMousePointer, MousePointer2, Plus,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
 } from "lucide-react";
 
