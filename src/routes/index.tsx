@@ -63,6 +63,7 @@ function Studio() {
 
   const [input, setInput] = useState("");
   const [chatWidth, setChatWidth] = useState(380);
+  const [shellWidth, setShellWidth] = useState(0);
   const [tool, setTool] = useState<Tool>("select");
   const [sizeIdx, setSizeIdx] = useState(0);
   const [fps, setFps] = useState(30);
