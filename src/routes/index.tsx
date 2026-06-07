@@ -195,7 +195,13 @@ function Studio() {
         <main className="flex-1 flex flex-col min-w-0 bg-canvas">
           {/* Floating tool dock */}
           <div className="relative flex-1 flex items-center justify-center p-6 min-h-0">
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 p-1 rounded-lg bg-panel/90 border border-border backdrop-blur shadow-lg">
+            <div
+              onMouseDown={(e) => {
+                dockPressRef.current = { mx: e.clientX, my: e.clientY, ox: dockPos.x, oy: dockPos.y, moved: false };
+              }}
+              style={{ transform: `translate(calc(-50% + ${dockPos.x}px), ${dockPos.y}px)` }}
+              className={`absolute top-4 left-1/2 z-10 flex items-center gap-0.5 p-1 rounded-lg bg-panel/90 border border-border backdrop-blur shadow-lg select-none ${dockDragging ? "cursor-grabbing" : "cursor-grab"}`}
+            >
               {[
                 { id: "move", Icon: MousePointer2, label: "Move" },
                 { id: "select", Icon: SquareDashedMousePointer, label: "Highlight area" },
@@ -204,8 +210,11 @@ function Studio() {
                 <button
                   key={id}
                   title={label}
-                  onClick={() => setTool(id as Tool)}
-                  className={`h-8 w-8 grid place-items-center rounded-md transition-colors ${
+                  onClick={() => {
+                    if (dockSuppressClickRef.current) return;
+                    setTool(id as Tool);
+                  }}
+                  className={`h-8 w-8 grid place-items-center rounded-md transition-colors cursor-pointer ${
                     tool === id ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
                   }`}
                 >
