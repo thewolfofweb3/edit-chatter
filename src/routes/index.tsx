@@ -550,7 +550,7 @@ function Studio() {
             </div>
           ) : (
             <>
-              <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
+              <div key={currentChatId} ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3 animate-fade-in">
                 {messages.map((m) => (
                   <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                     <div
