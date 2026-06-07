@@ -76,7 +76,6 @@ function Studio() {
           {[
             { Icon: ImageIcon, active: true, label: "Images" },
             { Icon: Film, label: "Clips" },
-            { Icon: Film, label: "Clips" },
             { Icon: Layers, label: "Layers" },
             { Icon: Folder, label: "Assets" },
             { Icon: Wand2, label: "Effects" },
