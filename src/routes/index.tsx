@@ -334,60 +334,42 @@ function Studio() {
       {/* Top bar */}
       <header className="h-10 flex items-center justify-between px-3 border-b border-border bg-panel text-sm">
         <div className="flex items-center gap-3">
-          {(() => {
-            const sectionLabels: Record<string, string> = {
-              workspace: "Workspace",
-              projects: "Projects",
-              assets: "Assets",
-              templates: "Templates",
-              tutorials: "Tutorials",
-            };
-            const section = sectionLabels[activeTab] ?? "Workspace";
-            return (
-              <>
-                <button className="text-muted-foreground hover:text-foreground transition-colors">
-                  {section}
-                </button>
-                {activeTab === "workspace" && (
-                  <>
-                    <span className="text-muted-foreground/60">/</span>
-                    {projectRenaming ? (
-                      <input
-                        autoFocus
-                        value={projectRenameValue}
-                        onChange={(e) => setProjectRenameValue(e.target.value)}
-                        onBlur={() => {
-                          setProjectName(projectRenameValue.trim() || "untitled-project");
-                          setProjectRenaming(false);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            setProjectName(projectRenameValue.trim() || "untitled-project");
-                            setProjectRenaming(false);
-                          } else if (e.key === "Escape") {
-                            setProjectRenaming(false);
-                          }
-                        }}
-                        className="h-7 px-2 text-sm bg-input/60 border border-border rounded-md outline-none focus:border-primary/60 min-w-0"
-                      />
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setProjectRenameValue(projectName);
-                          setProjectRenaming(true);
-                        }}
-                        title="Rename project"
-                        className="h-7 px-2 flex items-center gap-1.5 rounded-md text-sm hover:bg-accent text-foreground/90 group animate-in fade-in slide-in-from-left-1 duration-200"
-                      >
-                        <span className="truncate">{projectName}</span>
-                        <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 shrink-0" />
-                      </button>
-                    )}
-                  </>
-                )}
-              </>
-            );
-          })()}
+          <button className="text-muted-foreground hover:text-foreground transition-colors">
+            Workspace
+          </button>
+          <span className="text-muted-foreground/60">/</span>
+          {projectRenaming ? (
+            <input
+              autoFocus
+              value={projectRenameValue}
+              onChange={(e) => setProjectRenameValue(e.target.value)}
+              onBlur={() => {
+                setProjectName(projectRenameValue.trim() || "untitled-project");
+                setProjectRenaming(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setProjectName(projectRenameValue.trim() || "untitled-project");
+                  setProjectRenaming(false);
+                } else if (e.key === "Escape") {
+                  setProjectRenaming(false);
+                }
+              }}
+              className="h-7 px-2 text-sm bg-input/60 border border-border rounded-md outline-none focus:border-primary/60 min-w-0"
+            />
+          ) : (
+            <button
+              onClick={() => {
+                setProjectRenameValue(projectName);
+                setProjectRenaming(true);
+              }}
+              title="Rename project"
+              className="h-7 px-2 flex items-center gap-1.5 rounded-md text-sm hover:bg-accent text-foreground/90 group"
+            >
+              <span className="truncate">{projectName}</span>
+              <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 shrink-0" />
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button className="px-2.5 py-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground flex items-center gap-1.5">
