@@ -274,31 +274,46 @@ function Studio() {
     setIsThinking(true);
 
     try {
-      if (mode === "video") {
-        // Phase 2 — call chat LLM for a friendly response.
-        const r = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: [{ role: "user", content: t || "(no message)" }],
-          }),
-        });
-        const data = await r.json();
-        pushMessage(
-          "ai",
-          data.text ??
-            "Video generation is arriving in phase 2 — image pipeline ships first.",
-        );
+      // Build conversation history for the orchestrator.
+      const history = [...messages, { role: "user" as const, text: t }].map((m) => ({
+        role: (m.role === "ai" ? "assistant" : "user") as "assistant" | "user",
+        content: m.text || "(no text)",
+      }));
+
+      // Step 1 — orchestrator decides: chat reply vs image action.
+      const routeRes = await fetch("/api/orchestrate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: history,
+          hasImage: !!previewImage,
+          hasMask: hasStrokes,
+          mode,
+        }),
+      });
+      const decision = await routeRes.json();
+      if (!routeRes.ok) {
+        pushMessage("ai", `⚠️ ${decision.error || "Orchestrator failed"}`);
         return;
       }
 
-      // PHOTO MODE
-      const isEdit = !!previewImage && hasStrokes;
+      // Video mode is still a stub — always chat.
+      if (mode === "video" || decision.action === "chat") {
+        pushMessage("ai", decision.reply || "…");
+        return;
+      }
+
+      // Step 2 — image action. Announce, then run the pipeline.
+      if (decision.reply) pushMessage("ai", decision.reply);
+
+      const isEdit = !!decision.isEdit && !!previewImage && hasStrokes;
+      const imgPrompt: string = decision.prompt || t;
+
       const r = await fetch("/api/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: t || (isEdit ? "Edit the highlighted region" : "Generate an image"),
+          prompt: imgPrompt,
           mode: isEdit ? "edit" : "generate",
           imageBase64: isEdit && previewImage ? dataUrlToBase64(previewImage) : undefined,
           maskBase64: isEdit && maskDataUrl ? dataUrlToBase64(maskDataUrl) : undefined,
@@ -312,7 +327,6 @@ function Studio() {
 
       let finalDataUrl: string = data.dataUrl;
       if (isEdit && previewImage && maskDataUrl) {
-        // Strict composite: original pixels outside the mask stay byte-identical.
         try {
           finalDataUrl = await compositeWithMask(previewImage, data.dataUrl, maskDataUrl);
         } catch (e) {
@@ -323,7 +337,7 @@ function Studio() {
       setPreviewImage(finalDataUrl);
       setStrokes([]);
       setCurrentStroke(null);
-      pushMessage("ai", isEdit ? "Edited the highlighted region." : "Generated.", [
+      pushMessage("ai", isEdit ? "Edited the highlighted region." : "Done.", [
         { id: Date.now(), name: isEdit ? "edited.png" : "generated.png", type: "image/png", url: finalDataUrl },
       ]);
     } catch (e) {
@@ -333,6 +347,7 @@ function Studio() {
       setIsThinking(false);
     }
   }
+
 
   function newChat() {
     const id = Date.now();

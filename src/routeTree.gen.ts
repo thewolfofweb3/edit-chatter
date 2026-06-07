@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiOrchestrateRouteImport } from './routes/api/orchestrate'
 import { Route as ApiImageRouteImport } from './routes/api/image'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrchestrateRoute = ApiOrchestrateRouteImport.update({
+  id: '/api/orchestrate',
+  path: '/api/orchestrate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiImageRoute = ApiImageRouteImport.update({
@@ -33,30 +39,34 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/image': typeof ApiImageRoute
+  '/api/orchestrate': typeof ApiOrchestrateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/image': typeof ApiImageRoute
+  '/api/orchestrate': typeof ApiOrchestrateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/image': typeof ApiImageRoute
+  '/api/orchestrate': typeof ApiOrchestrateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/chat' | '/api/image'
+  fullPaths: '/' | '/api/chat' | '/api/image' | '/api/orchestrate'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/chat' | '/api/image'
-  id: '__root__' | '/' | '/api/chat' | '/api/image'
+  to: '/' | '/api/chat' | '/api/image' | '/api/orchestrate'
+  id: '__root__' | '/' | '/api/chat' | '/api/image' | '/api/orchestrate'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiImageRoute: typeof ApiImageRoute
+  ApiOrchestrateRoute: typeof ApiOrchestrateRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/orchestrate': {
+      id: '/api/orchestrate'
+      path: '/api/orchestrate'
+      fullPath: '/api/orchestrate'
+      preLoaderRoute: typeof ApiOrchestrateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/image': {
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiChatRoute: ApiChatRoute,
   ApiImageRoute: ApiImageRoute,
+  ApiOrchestrateRoute: ApiOrchestrateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
