@@ -7,7 +7,9 @@ import {
   SquareDashedMousePointer, MousePointer2, Plus, Brush,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
   LayoutGrid, Library, Sparkles, Clock, Save, LayoutTemplate, GraduationCap,
+  Target,
 } from "lucide-react";
+import { buildMaskDataUrl, compositeWithMask, dataUrlToBase64, loadImage } from "@/lib/imageOps";
 
 export const Route = createFileRoute("/")({
   head: () => ({
