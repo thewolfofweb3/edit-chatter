@@ -166,6 +166,10 @@ function Studio() {
     return () => ro.disconnect();
   }, []);
 
+  const previewWidth = Math.max(0, shellWidth - 48 - 4 - chatWidth);
+  const previewCollapsed = shellWidth > 0 && previewWidth < 240;
+
+
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
