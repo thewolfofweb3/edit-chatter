@@ -13,7 +13,7 @@ type RouteBody = {
   mode: "photo" | "video";
 };
 
-export const Route = createFileRoute("/api")({
+export const Route = createFileRoute("/api/orchestrate")({
   server: {
     handlers: {
       GET: async () =>
