@@ -38,6 +38,40 @@ function Studio() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
+  // Tool dock dragging
+  const [dockPos, setDockPos] = useState({ x: 0, y: 0 });
+  const [dockDragging, setDockDragging] = useState(false);
+  const dockPressRef = useRef<{ mx: number; my: number; ox: number; oy: number; moved: boolean } | null>(null);
+  const dockSuppressClickRef = useRef(false);
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      const p = dockPressRef.current;
+      if (!p) return;
+      const dx = e.clientX - p.mx;
+      const dy = e.clientY - p.my;
+      if (!p.moved && Math.hypot(dx, dy) < 4) return;
+      p.moved = true;
+      dockSuppressClickRef.current = true;
+      setDockDragging(true);
+      setDockPos({ x: p.ox + dx, y: p.oy + dy });
+    }
+    function onUp() {
+      if (dockPressRef.current) {
+        dockPressRef.current = null;
+        setDockDragging(false);
+        // clear suppression after the click event has fired
+        setTimeout(() => { dockSuppressClickRef.current = false; }, 0);
+      }
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
   useEffect(() => {
     function onMove(e: MouseEvent) {
       if (!draggingRef.current || !shellRef.current) return;
@@ -161,7 +195,13 @@ function Studio() {
         <main className="flex-1 flex flex-col min-w-0 bg-canvas">
           {/* Floating tool dock */}
           <div className="relative flex-1 flex items-center justify-center p-6 min-h-0">
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 p-1 rounded-lg bg-panel/90 border border-border backdrop-blur shadow-lg">
+            <div
+              onMouseDown={(e) => {
+                dockPressRef.current = { mx: e.clientX, my: e.clientY, ox: dockPos.x, oy: dockPos.y, moved: false };
+              }}
+              style={{ transform: `translate(calc(-50% + ${dockPos.x}px), ${dockPos.y}px)` }}
+              className={`absolute top-4 left-1/2 z-10 flex items-center gap-0.5 p-1 rounded-lg bg-panel/90 border border-border backdrop-blur shadow-lg select-none ${dockDragging ? "cursor-grabbing" : "cursor-grab"}`}
+            >
               {[
                 { id: "move", Icon: MousePointer2, label: "Move" },
                 { id: "select", Icon: SquareDashedMousePointer, label: "Highlight area" },
@@ -170,8 +210,11 @@ function Studio() {
                 <button
                   key={id}
                   title={label}
-                  onClick={() => setTool(id as Tool)}
-                  className={`h-8 w-8 grid place-items-center rounded-md transition-colors ${
+                  onClick={() => {
+                    if (dockSuppressClickRef.current) return;
+                    setTool(id as Tool);
+                  }}
+                  className={`h-8 w-8 grid place-items-center rounded-md transition-colors cursor-pointer ${
                     tool === id ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
                   }`}
                 >
