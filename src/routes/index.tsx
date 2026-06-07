@@ -75,7 +75,7 @@ function Studio() {
         <aside className="w-12 bg-rail border-r border-border flex flex-col items-center py-2 gap-1">
           {[
             { Icon: ImageIcon, active: true, label: "Images" },
-            { Icon: ImageIcon, label: "Images" },
+            { Icon: Film, label: "Clips" },
             { Icon: Film, label: "Clips" },
             { Icon: Layers, label: "Layers" },
             { Icon: Folder, label: "Assets" },
