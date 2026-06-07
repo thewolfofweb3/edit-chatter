@@ -119,7 +119,8 @@ function Studio() {
     function onMove(e: MouseEvent) {
       if (!draggingRef.current || !shellRef.current) return;
       const rect = shellRef.current.getBoundingClientRect();
-      setChatWidth(Math.min(640, Math.max(280, rect.right - e.clientX)));
+      const next = rect.right - e.clientX;
+      setChatWidth(Math.max(0, Math.min(rect.width, next)));
     }
     function onUp() {
       draggingRef.current = false;
