@@ -6,6 +6,7 @@ import {
   MessageSquarePlus, History, Paperclip,
   SquareDashedMousePointer, MousePointer2, Plus,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
+  LayoutGrid, Library, Sparkles, Clock, Save,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
