@@ -4,7 +4,7 @@ import {
   Image as ImageIcon, Film, Layers, Wand2, Settings,
   Folder, Download, Upload, Send, ChevronDown,
   MessageSquarePlus, PanelRightClose, History, Paperclip,
-  SquareDashedMousePointer, MousePointer2, Hand, X,
+  SquareDashedMousePointer, MousePointer2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
