@@ -394,86 +394,208 @@ function Studio() {
         </main>
 
         {/* Resize handle */}
-        <div
-          onMouseDown={() => {
-            draggingRef.current = true;
-            document.body.style.cursor = "col-resize";
-            document.body.style.userSelect = "none";
-          }}
-          className="w-1 cursor-col-resize bg-border hover:bg-primary/60 transition-colors"
-        />
+        {!panelHidden && (
+          <div
+            onMouseDown={() => {
+              draggingRef.current = true;
+              document.body.style.cursor = "col-resize";
+              document.body.style.userSelect = "none";
+            }}
+            className="w-1 cursor-col-resize bg-border hover:bg-primary/60 transition-colors"
+          />
+        )}
 
         {/* Right: AI chat */}
+        {panelHidden ? (
+          <button
+            onClick={() => setPanelHidden(false)}
+            title="Show chat"
+            className="absolute top-12 right-2 z-20 h-9 w-9 grid place-items-center rounded-md bg-panel/90 border border-border backdrop-blur shadow text-muted-foreground hover:text-foreground hover:bg-accent"
+          >
+            <PanelRightOpen className="h-4 w-4" />
+          </button>
+        ) : (
         <aside style={{ width: chatWidth }} className="bg-panel border-l border-border flex flex-col min-h-0 shrink-0">
           <div className="h-11 px-2 flex items-center justify-between border-b border-border gap-1">
             <div className="flex items-center gap-1 min-w-0">
-              <button title="Project chats" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent shrink-0">
-                <History className="h-4 w-4" />
+              <button
+                onClick={() => setPanelView(panelView === "history" ? "chat" : "history")}
+                title={panelView === "history" ? "Back to chat" : "Project chats"}
+                className={`h-8 w-8 grid place-items-center rounded-md shrink-0 ${
+                  panelView === "history" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                }`}
+              >
+                {panelView === "history" ? <ArrowLeft className="h-4 w-4" /> : <History className="h-4 w-4" />}
               </button>
-              <button className="h-8 px-2 flex items-center gap-1.5 rounded-md text-sm hover:bg-accent text-foreground/90 min-w-0">
-                <span className="truncate">Untitled chat</span>
-                <ChevronDown className="h-3.5 w-3.5 opacity-60 shrink-0" />
-              </button>
+              {panelView === "chat" ? (
+                renaming ? (
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitRename();
+                      if (e.key === "Escape") setRenaming(false);
+                    }}
+                    className="h-8 px-2 text-sm bg-input/60 border border-border rounded-md outline-none focus:border-primary/60 min-w-0 flex-1"
+                  />
+                ) : (
+                  <button
+                    onClick={startRename}
+                    title="Rename chat"
+                    className="h-8 px-2 flex items-center gap-1.5 rounded-md text-sm hover:bg-accent text-foreground/90 min-w-0 group"
+                  >
+                    <span className="truncate">{currentChat.name}</span>
+                    <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 shrink-0" />
+                  </button>
+                )
+              ) : (
+                <span className="px-2 text-sm text-foreground/90">Chat history</span>
+              )}
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
-              <button title="New chat" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
+              <button onClick={newChat} title="New chat" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
                 <MessageSquarePlus className="h-4 w-4" />
               </button>
-              <button title="Hide panel" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
+              <button onClick={() => setPanelHidden(true)} title="Hide panel" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
                 <PanelRightClose className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
-            {messages.map((m) => (
-              <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-                    m.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-br-sm"
-                      : "bg-accent text-foreground rounded-bl-sm"
-                  }`}
-                >
-                  {m.text && <div>{m.text}</div>}
+          {panelView === "history" ? (
+            <div className="flex-1 overflow-y-auto py-2">
+              {chats.length === 0 && (
+                <div className="px-4 py-8 text-center text-sm text-muted-foreground">No chats yet.</div>
+              )}
+              {[...chats].sort((a, b) => b.updatedAt - a.updatedAt).map((c) => {
+                const last = c.messages[c.messages.length - 1];
+                const preview = last?.text || (last?.attachments?.length ? `📎 ${last.attachments[0].name}` : "");
+                const active = c.id === currentChatId;
+                return (
+                  <div
+                    key={c.id}
+                    className={`group flex items-start gap-2 px-3 py-2.5 cursor-pointer border-l-2 ${
+                      active ? "bg-accent/60 border-primary" : "border-transparent hover:bg-accent/40"
+                    }`}
+                    onClick={() => openChat(c.id)}
+                  >
+                    <MessageSquare className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-foreground/90 truncate">{c.name}</div>
+                      <div className="text-xs text-muted-foreground truncate">{preview || "No messages yet"}</div>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}
+                      title="Delete chat"
+                      className="opacity-0 group-hover:opacity-100 h-7 w-7 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent shrink-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
+                {messages.map((m) => (
+                  <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                        m.role === "user"
+                          ? "bg-primary text-primary-foreground rounded-br-sm"
+                          : "bg-accent text-foreground rounded-bl-sm"
+                      }`}
+                    >
+                      {m.attachments && m.attachments.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-1.5">
+                          {m.attachments.map((a) => (
+                            a.url ? (
+                              <img key={a.id} src={a.url} alt={a.name} className="max-h-32 rounded-md border border-border/40" />
+                            ) : (
+                              <div key={a.id} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-background/20 text-xs">
+                                <FileText className="h-3 w-3" /> {a.name}
+                              </div>
+                            )
+                          ))}
+                        </div>
+                      )}
+                      {m.text && <div>{m.text}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Composer */}
+              <div className="p-3 border-t border-border">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={onPickFiles}
+                />
+                <div className="rounded-xl bg-input/60 border border-border focus-within:border-primary/60 transition-colors">
+                  {pendingAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 p-2 border-b border-border/60">
+                      {pendingAttachments.map((a) => (
+                        <div key={a.id} className="group relative flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-md bg-background/40 border border-border/60 text-xs">
+                          {a.url ? (
+                            <img src={a.url} alt={a.name} className="h-5 w-5 object-cover rounded" />
+                          ) : (
+                            <FileText className="h-3 w-3" />
+                          )}
+                          <span className="max-w-[140px] truncate">{a.name}</span>
+                          <button
+                            onClick={() => removePending(a.id)}
+                            className="h-4 w-4 grid place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <textarea
+                    ref={composerRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        send();
+                      }
+                    }}
+                    rows={2}
+                    placeholder="Type here — ask the AI to edit, generate, or refine…"
+                    className="w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+                  />
+                  <div className="flex items-center justify-between px-2 pb-2">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+                      title="Attach file"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={send}
+                      className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40"
+                      disabled={!input.trim() && pendingAttachments.length === 0}
+                    >
+                      Send <Send className="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* Composer */}
-          <div className="p-3 border-t border-border">
-            <div className="rounded-xl bg-input/60 border border-border focus-within:border-primary/60 transition-colors">
-              <textarea
-                ref={composerRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    send();
-                  }
-                }}
-                rows={2}
-                placeholder="Type here — ask the AI to edit, generate, or refine…"
-                className="w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-              />
-              <div className="flex items-center justify-between px-2 pb-2">
-                <button className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent" title="Attach">
-                  <Paperclip className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={send}
-                  className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40"
-                  disabled={!input.trim()}
-                >
-                  Send <Send className="h-3 w-3" />
-                </button>
-              </div>
-            </div>
-          </div>
+            </>
+          )}
         </aside>
+        )}
       </div>
+
 
       {/* Status bar */}
       <footer className="h-6 border-t border-border bg-rail text-[11px] text-muted-foreground flex items-center px-3 gap-4">
