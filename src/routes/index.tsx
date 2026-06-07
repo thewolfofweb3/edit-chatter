@@ -400,6 +400,7 @@ function Studio() {
               {[
                 { id: "move", Icon: MousePointer2, label: "Move" },
                 { id: "select", Icon: SquareDashedMousePointer, label: "Highlight area" },
+                { id: "line", Icon: Slash, label: "Draw line (click two endpoints)" },
               ].map(({ id, Icon, label }) => (
                 <button
                   key={id}
