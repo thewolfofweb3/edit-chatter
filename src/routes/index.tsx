@@ -449,16 +449,16 @@ function Studio() {
                     <line
                       key={i}
                       x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y}
-                      stroke="oklch(var(--primary))" strokeWidth={2} strokeLinecap="round"
+                      stroke="var(--primary)" strokeWidth={2} strokeLinecap="round"
                     />
                   ))}
                   {lineStart && cursorPt && (
                     <>
                       <line
                         x1={lineStart.x} y1={lineStart.y} x2={cursorPt.x} y2={cursorPt.y}
-                        stroke="oklch(var(--primary))" strokeWidth={2} strokeDasharray="4 4" strokeLinecap="round"
+                        stroke="var(--primary)" strokeWidth={2} strokeDasharray="4 4" strokeLinecap="round"
                       />
-                      <circle cx={lineStart.x} cy={lineStart.y} r={4} fill="oklch(var(--primary))" />
+                      <circle cx={lineStart.x} cy={lineStart.y} r={4} fill="var(--primary)" />
                     </>
                   )}
                 </svg>
