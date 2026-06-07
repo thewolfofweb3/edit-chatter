@@ -4,7 +4,7 @@ import {
   Image as ImageIcon, Film, Layers, Wand2, Settings,
   Folder, Download, Upload, Send, ChevronDown,
   MessageSquarePlus, History, Paperclip,
-  SquareDashedMousePointer, MousePointer2, Plus,
+  SquareDashedMousePointer, MousePointer2, Plus, Slash,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
   LayoutGrid, Library, Sparkles, Clock, Save, LayoutTemplate, GraduationCap,
 } from "lucide-react";
@@ -23,7 +23,9 @@ type Attachment = { id: number; name: string; type: string; url?: string };
 type Msg = { id: number; role: "user" | "ai"; text: string; attachments?: Attachment[] };
 type Chat = { id: number; name: string; messages: Msg[]; updatedAt: number };
 type Sel = { x: number; y: number; w: number; h: number };
-type Tool = "move" | "select";
+type Tool = "move" | "select" | "line";
+type Pt = { x: number; y: number };
+type Line = { a: Pt; b: Pt };
 type Preset = { label: string; w: number; h: number; ratio: string };
 type PanelView = "chat" | "history";
 
@@ -87,7 +89,10 @@ function Studio() {
   const messages = currentChat?.messages ?? [];
 
   const [selection, setSelection] = useState<Sel | null>(null);
-  
+  const [lines, setLines] = useState<Line[]>([]);
+  const [lineStart, setLineStart] = useState<Pt | null>(null);
+  const [cursorPt, setCursorPt] = useState<Pt | null>(null);
+
   const [drawing, setDrawing] = useState<{ x: number; y: number } | null>(null);
 
   const draggingRef = useRef(false);
@@ -279,23 +284,42 @@ function Studio() {
     setPendingAttachments((p) => p.filter((a) => a.id !== id));
   }
 
-  // Selection drawing on canvas
-  function onCanvasDown(e: React.MouseEvent) {
-    if (tool !== "select" || !canvasRef.current) return;
+  // Canvas pointer handlers (select = drag rect, line = two-click endpoints)
+  function canvasPoint(e: React.MouseEvent): Pt | null {
+    if (!canvasRef.current) return null;
     const r = canvasRef.current.getBoundingClientRect();
-    setDrawing({ x: e.clientX - r.left, y: e.clientY - r.top });
-    setSelection(null);
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  function onCanvasDown(e: React.MouseEvent) {
+    const p = canvasPoint(e);
+    if (!p) return;
+    if (tool === "select") {
+      setDrawing(p);
+      setSelection(null);
+    } else if (tool === "line") {
+      if (!lineStart) {
+        setLineStart(p);
+        setCursorPt(p);
+      } else {
+        setLines((prev) => [...prev, { a: lineStart, b: p }]);
+        setLineStart(null);
+        setCursorPt(null);
+      }
+    }
   }
   function onCanvasMove(e: React.MouseEvent) {
-    if (!drawing || !canvasRef.current) return;
-    const r = canvasRef.current.getBoundingClientRect();
-    const cx = e.clientX - r.left, cy = e.clientY - r.top;
-    setSelection({
-      x: Math.min(drawing.x, cx),
-      y: Math.min(drawing.y, cy),
-      w: Math.abs(cx - drawing.x),
-      h: Math.abs(cy - drawing.y),
-    });
+    const p = canvasPoint(e);
+    if (!p) return;
+    if (tool === "select" && drawing) {
+      setSelection({
+        x: Math.min(drawing.x, p.x),
+        y: Math.min(drawing.y, p.y),
+        w: Math.abs(p.x - drawing.x),
+        h: Math.abs(p.y - drawing.y),
+      });
+    } else if (tool === "line" && lineStart) {
+      setCursorPt(p);
+    }
   }
   function onCanvasUp() {
     if (drawing && selection && (selection.w < 8 || selection.h < 8)) {
@@ -304,7 +328,7 @@ function Studio() {
     setDrawing(null);
   }
 
-  const cursorClass = tool === "select" ? "cursor-crosshair" : "cursor-default";
+  const cursorClass = tool === "select" || tool === "line" ? "cursor-crosshair" : "cursor-default";
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden">
@@ -376,6 +400,7 @@ function Studio() {
               {[
                 { id: "move", Icon: MousePointer2, label: "Move" },
                 { id: "select", Icon: SquareDashedMousePointer, label: "Highlight area" },
+                { id: "line", Icon: Slash, label: "Draw line (click two endpoints)" },
               ].map(({ id, Icon, label }) => (
                 <button
                   key={id}
@@ -416,6 +441,27 @@ function Studio() {
                   className="absolute border border-primary bg-primary/10 pointer-events-none"
                   style={{ left: selection.x, top: selection.y, width: selection.w, height: selection.h }}
                 />
+              )}
+
+              {(lines.length > 0 || lineStart) && (
+                <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                  {lines.map((l, i) => (
+                    <line
+                      key={i}
+                      x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y}
+                      stroke="var(--primary)" strokeWidth={2} strokeLinecap="round"
+                    />
+                  ))}
+                  {lineStart && cursorPt && (
+                    <>
+                      <line
+                        x1={lineStart.x} y1={lineStart.y} x2={cursorPt.x} y2={cursorPt.y}
+                        stroke="var(--primary)" strokeWidth={2} strokeDasharray="4 4" strokeLinecap="round"
+                      />
+                      <circle cx={lineStart.x} cy={lineStart.y} r={4} fill="var(--primary)" />
+                    </>
+                  )}
+                </svg>
               )}
             </div>
 
