@@ -36,7 +36,7 @@ const SIZE_PRESETS: Preset[] = [
 ];
 const FPS_PRESETS = [24, 30, 60];
 
-const WELCOME: Msg = { id: 1, role: "ai", text: "Drop an image or video on the canvas, or just tell me what you want to make. Highlight any area of the preview to ask about just that part." };
+
 
 function Studio() {
   const [chats, setChats] = useState<Chat[]>([
