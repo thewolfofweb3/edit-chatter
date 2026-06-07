@@ -406,28 +406,17 @@ function Studio() {
         </main>
 
         {/* Resize handle */}
-        {!panelHidden && (
-          <div
-            onMouseDown={() => {
-              draggingRef.current = true;
-              document.body.style.cursor = "col-resize";
-              document.body.style.userSelect = "none";
-            }}
-            className="w-1 cursor-col-resize bg-border hover:bg-primary/60 transition-colors"
-          />
-        )}
+        <div
+          onMouseDown={() => {
+            draggingRef.current = true;
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+          }}
+          className="w-1 cursor-col-resize bg-border hover:bg-primary/60 transition-colors shrink-0"
+        />
 
         {/* Right: AI chat */}
-        {panelHidden ? (
-          <button
-            onClick={() => setPanelHidden(false)}
-            title="Show chat"
-            className="absolute top-12 right-2 z-20 h-9 w-9 grid place-items-center rounded-md bg-panel/90 border border-border backdrop-blur shadow text-muted-foreground hover:text-foreground hover:bg-accent"
-          >
-            <PanelRightOpen className="h-4 w-4" />
-          </button>
-        ) : (
-        <aside style={{ width: chatWidth }} className="bg-panel border-l border-border flex flex-col min-h-0 shrink-0">
+        <aside style={{ width: chatWidth }} className="bg-panel border-l border-border flex flex-col min-h-0 shrink-0 overflow-hidden">
           <div className="h-11 px-2 flex items-center justify-between border-b border-border gap-1">
             <div className="flex items-center gap-1 min-w-0">
               <button
