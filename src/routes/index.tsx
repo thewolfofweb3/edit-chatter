@@ -206,25 +206,132 @@ function Studio() {
     setChats((cs) => cs.map((c) => (c.id === id ? updater(c) : c)));
   }
 
-  function send() {
-    const t = input.trim();
-    if (!t && pendingAttachments.length === 0) return;
-    const id = Date.now();
-    const atts = pendingAttachments;
+  function pushMessage(role: "user" | "ai", text: string, attachments?: Attachment[]) {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
     updateChat(currentChatId, (c) => ({
       ...c,
       updatedAt: Date.now(),
-      messages: [...c.messages, { id, role: "user", text: t, attachments: atts.length ? atts : undefined }],
+      messages: [...c.messages, { id, role, text, attachments }],
     }));
+    return id;
+  }
+
+  async function send() {
+    const t = input.trim();
+    if ((!t && pendingAttachments.length === 0) || isThinking) return;
+
+    // Snapshot any masked region as a chat attachment so the user can SEE
+    // exactly what the AI is being shown.
+    const hasStrokes = strokes.length > 0 && !!previewImage;
+    const userAtts: Attachment[] = [...pendingAttachments];
+    let maskDataUrl: string | null = null;
+
+    if (hasStrokes && previewImage && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      try {
+        const img = await loadImage(previewImage);
+        maskDataUrl = buildMaskDataUrl(
+          strokes,
+          rect.width,
+          rect.height,
+          img.naturalWidth,
+          img.naturalHeight,
+          18,
+        );
+        // Build a visual preview chip = original w/ red stroke overlay.
+        const chip = document.createElement("canvas");
+        chip.width = img.naturalWidth;
+        chip.height = img.naturalHeight;
+        const cctx = chip.getContext("2d")!;
+        cctx.drawImage(img, 0, 0);
+        const maskImg = await loadImage(maskDataUrl);
+        cctx.globalAlpha = 0.55;
+        cctx.globalCompositeOperation = "source-over";
+        // Tint the mask red.
+        const tint = document.createElement("canvas");
+        tint.width = chip.width; tint.height = chip.height;
+        const tctx = tint.getContext("2d")!;
+        tctx.drawImage(maskImg, 0, 0);
+        tctx.globalCompositeOperation = "source-in";
+        tctx.fillStyle = "rgba(239, 68, 68, 1)";
+        tctx.fillRect(0, 0, tint.width, tint.height);
+        cctx.drawImage(tint, 0, 0);
+        cctx.globalAlpha = 1;
+        userAtts.push({
+          id: Date.now(),
+          name: "highlighted-region.png",
+          type: "image/png",
+          url: chip.toDataURL("image/png"),
+        });
+      } catch (e) {
+        console.error("mask snapshot failed", e);
+      }
+    }
+
+    pushMessage("user", t, userAtts.length ? userAtts : undefined);
     setInput("");
     setPendingAttachments([]);
-    setTimeout(() => {
-      updateChat(currentChatId, (c) => ({
-        ...c,
-        updatedAt: Date.now(),
-        messages: [...c.messages, { id: id + 1, role: "ai", text: "Got it — working on that." }],
-      }));
-    }, 500);
+    setIsThinking(true);
+
+    try {
+      if (mode === "video") {
+        // Phase 2 — call chat LLM for a friendly response.
+        const r = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: t || "(no message)" }],
+          }),
+        });
+        const data = await r.json();
+        pushMessage(
+          "ai",
+          data.text ??
+            "Video generation is arriving in phase 2 — image pipeline ships first.",
+        );
+        return;
+      }
+
+      // PHOTO MODE
+      const isEdit = !!previewImage && hasStrokes;
+      const r = await fetch("/api/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: t || (isEdit ? "Edit the highlighted region" : "Generate an image"),
+          mode: isEdit ? "edit" : "generate",
+          imageBase64: isEdit && previewImage ? dataUrlToBase64(previewImage) : undefined,
+          maskBase64: isEdit && maskDataUrl ? dataUrlToBase64(maskDataUrl) : undefined,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.dataUrl) {
+        pushMessage("ai", `⚠️ ${data.error || "Image generation failed"}`);
+        return;
+      }
+
+      let finalDataUrl: string = data.dataUrl;
+      if (isEdit && previewImage && maskDataUrl) {
+        // Strict composite: original pixels outside the mask stay byte-identical.
+        try {
+          finalDataUrl = await compositeWithMask(previewImage, data.dataUrl, maskDataUrl);
+        } catch (e) {
+          console.error("composite failed, using raw edit", e);
+        }
+      }
+
+      setPreviewImage(finalDataUrl);
+      setStrokes([]);
+      setCurrentStroke(null);
+      pushMessage("ai", isEdit ? "Edited the highlighted region." : "Generated.", [
+        { id: Date.now(), name: isEdit ? "edited.png" : "generated.png", type: "image/png", url: finalDataUrl },
+      ]);
+    } catch (e) {
+      console.error(e);
+      pushMessage("ai", `⚠️ ${e instanceof Error ? e.message : "Request failed"}`);
+    } finally {
+      setIsThinking(false);
+    }
   }
 
   function newChat() {
