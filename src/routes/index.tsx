@@ -36,11 +36,11 @@ const SIZE_PRESETS: Preset[] = [
 ];
 const FPS_PRESETS = [24, 30, 60];
 
-const WELCOME: Msg = { id: 1, role: "ai", text: "Drop an image or video on the canvas, or just tell me what you want to make. Highlight any area of the preview to ask about just that part." };
+
 
 function Studio() {
   const [chats, setChats] = useState<Chat[]>([
-    { id: 1, name: "Untitled chat", messages: [WELCOME], updatedAt: Date.now() },
+    { id: 1, name: "Untitled chat", messages: [], updatedAt: Date.now() },
   ]);
   const [currentChatId, setCurrentChatId] = useState<number>(1);
   const [panelView, setPanelView] = useState<PanelView>("chat");
@@ -207,7 +207,7 @@ function Studio() {
       let name = "Untitled chat";
       let n = 2;
       while (existing.has(name)) name = `Untitled chat ${n++}`;
-      return [{ id, name, messages: [WELCOME], updatedAt: Date.now() }, ...cs];
+      return [{ id, name, messages: [], updatedAt: Date.now() }, ...cs];
     });
     setCurrentChatId(id);
     setPanelView("chat");
@@ -230,7 +230,7 @@ function Studio() {
       const next = cs.filter((c) => c.id !== id);
       if (next.length === 0) {
         const nid = Date.now();
-        const fresh = { id: nid, name: "Untitled chat", messages: [WELCOME], updatedAt: Date.now() };
+        const fresh = { id: nid, name: "Untitled chat", messages: [], updatedAt: Date.now() };
         setCurrentChatId(nid);
         return [fresh];
       }
