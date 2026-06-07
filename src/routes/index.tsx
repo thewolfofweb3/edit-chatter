@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import {
-  Sparkles, Image as ImageIcon, Film, Layers, Wand2, Settings,
-  Folder, Play, Pause, Download, Upload, Send, Plus, Scissors,
+  Image as ImageIcon, Film, Layers, Wand2, Settings,
+  Folder, Download, Upload, Send, Plus, Scissors,
   Type, Music, Maximize2, ChevronDown,
 } from "lucide-react";
 
