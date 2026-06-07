@@ -4,7 +4,7 @@ import {
   Image as ImageIcon, Film, Layers, Wand2, Settings,
   Folder, Download, Upload, Send, ChevronDown,
   MessageSquarePlus, History, Paperclip,
-  SquareDashedMousePointer, MousePointer2, Plus, Slash,
+  SquareDashedMousePointer, MousePointer2, Plus, Brush,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
   LayoutGrid, Library, Sparkles, Clock, Save, LayoutTemplate, GraduationCap,
 } from "lucide-react";
@@ -23,9 +23,9 @@ type Attachment = { id: number; name: string; type: string; url?: string };
 type Msg = { id: number; role: "user" | "ai"; text: string; attachments?: Attachment[] };
 type Chat = { id: number; name: string; messages: Msg[]; updatedAt: number };
 type Sel = { x: number; y: number; w: number; h: number };
-type Tool = "move" | "select" | "line";
+type Tool = "move" | "select" | "brush";
 type Pt = { x: number; y: number };
-type Line = { a: Pt; b: Pt };
+type Stroke = Pt[];
 type Preset = { label: string; w: number; h: number; ratio: string };
 type PanelView = "chat" | "history";
 
@@ -89,9 +89,8 @@ function Studio() {
   const messages = currentChat?.messages ?? [];
 
   const [selection, setSelection] = useState<Sel | null>(null);
-  const [lines, setLines] = useState<Line[]>([]);
-  const [lineStart, setLineStart] = useState<Pt | null>(null);
-  const [cursorPt, setCursorPt] = useState<Pt | null>(null);
+  const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
 
   const [drawing, setDrawing] = useState<{ x: number; y: number } | null>(null);
 
@@ -284,7 +283,7 @@ function Studio() {
     setPendingAttachments((p) => p.filter((a) => a.id !== id));
   }
 
-  // Canvas pointer handlers (select = drag rect, line = two-click endpoints)
+  // Canvas pointer handlers (select = drag rect, brush = free-draw stroke)
   function canvasPoint(e: React.MouseEvent): Pt | null {
     if (!canvasRef.current) return null;
     const r = canvasRef.current.getBoundingClientRect();
@@ -296,15 +295,8 @@ function Studio() {
     if (tool === "select") {
       setDrawing(p);
       setSelection(null);
-    } else if (tool === "line") {
-      if (!lineStart) {
-        setLineStart(p);
-        setCursorPt(p);
-      } else {
-        setLines((prev) => [...prev, { a: lineStart, b: p }]);
-        setLineStart(null);
-        setCursorPt(null);
-      }
+    } else if (tool === "brush") {
+      setCurrentStroke([p]);
     }
   }
   function onCanvasMove(e: React.MouseEvent) {
@@ -317,8 +309,8 @@ function Studio() {
         w: Math.abs(p.x - drawing.x),
         h: Math.abs(p.y - drawing.y),
       });
-    } else if (tool === "line" && lineStart) {
-      setCursorPt(p);
+    } else if (tool === "brush" && currentStroke) {
+      setCurrentStroke((prev) => (prev ? [...prev, p] : prev));
     }
   }
   function onCanvasUp() {
@@ -326,9 +318,13 @@ function Studio() {
       setSelection(null);
     }
     setDrawing(null);
+    if (currentStroke) {
+      if (currentStroke.length > 1) setStrokes((prev) => [...prev, currentStroke]);
+      setCurrentStroke(null);
+    }
   }
 
-  const cursorClass = tool === "select" || tool === "line" ? "cursor-crosshair" : "cursor-default";
+  const cursorClass = tool === "select" || tool === "brush" ? "cursor-crosshair" : "cursor-default";
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden">
@@ -400,7 +396,7 @@ function Studio() {
               {[
                 { id: "move", Icon: MousePointer2, label: "Move" },
                 { id: "select", Icon: SquareDashedMousePointer, label: "Highlight area" },
-                { id: "line", Icon: Slash, label: "Draw line (click two endpoints)" },
+                { id: "brush", Icon: Brush, label: "Brush (free draw)" },
               ].map(({ id, Icon, label }) => (
                 <button
                   key={id}
@@ -423,7 +419,7 @@ function Studio() {
               onMouseDown={onCanvasDown}
               onMouseMove={onCanvasMove}
               onMouseUp={onCanvasUp}
-              onMouseLeave={() => setDrawing(null)}
+              onMouseLeave={onCanvasUp}
               style={{ aspectRatio: SIZE_PRESETS[sizeIdx].ratio }}
               className={`relative w-full max-w-6xl max-h-full rounded-lg overflow-hidden border border-border shadow-2xl bg-[oklch(0.08_0.003_270)] select-none ${cursorClass}`}
             >
@@ -443,23 +439,22 @@ function Studio() {
                 />
               )}
 
-              {(lines.length > 0 || lineStart) && (
+              {(strokes.length > 0 || currentStroke) && (
                 <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                  {lines.map((l, i) => (
-                    <line
+                  {strokes.map((s, i) => (
+                    <polyline
                       key={i}
-                      x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y}
-                      stroke="var(--primary)" strokeWidth={2} strokeLinecap="round"
+                      points={s.map((p) => `${p.x},${p.y}`).join(" ")}
+                      fill="none"
+                      stroke="var(--primary)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"
                     />
                   ))}
-                  {lineStart && cursorPt && (
-                    <>
-                      <line
-                        x1={lineStart.x} y1={lineStart.y} x2={cursorPt.x} y2={cursorPt.y}
-                        stroke="var(--primary)" strokeWidth={2} strokeDasharray="4 4" strokeLinecap="round"
-                      />
-                      <circle cx={lineStart.x} cy={lineStart.y} r={4} fill="var(--primary)" />
-                    </>
+                  {currentStroke && currentStroke.length > 0 && (
+                    <polyline
+                      points={currentStroke.map((p) => `${p.x},${p.y}`).join(" ")}
+                      fill="none"
+                      stroke="var(--primary)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"
+                    />
                   )}
                 </svg>
               )}
