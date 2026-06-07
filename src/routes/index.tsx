@@ -49,6 +49,17 @@ function Studio() {
   const [renameValue, setRenameValue] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [plusOpen, setPlusOpen] = useState(false);
+  const plusRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!plusOpen) return;
+    function onDown(e: MouseEvent) {
+      if (plusRef.current && !plusRef.current.contains(e.target as Node)) setPlusOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [plusOpen]);
 
   const [input, setInput] = useState("");
   const [chatWidth, setChatWidth] = useState(380);
