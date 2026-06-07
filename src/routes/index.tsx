@@ -127,18 +127,83 @@ function Studio() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  function updateChat(id: number, updater: (c: Chat) => Chat) {
+    setChats((cs) => cs.map((c) => (c.id === id ? updater(c) : c)));
+  }
+
   function send() {
     const t = input.trim();
-    if (!t) return;
+    if (!t && pendingAttachments.length === 0) return;
     const id = Date.now();
-    setMessages((m) => [...m, { id, role: "user", text: t }]);
+    const atts = pendingAttachments;
+    updateChat(currentChatId, (c) => ({
+      ...c,
+      updatedAt: Date.now(),
+      messages: [...c.messages, { id, role: "user", text: t, attachments: atts.length ? atts : undefined }],
+    }));
     setInput("");
+    setPendingAttachments([]);
     setTimeout(() => {
-      setMessages((m) => [
-        ...m,
-        { id: id + 1, role: "ai", text: "Got it — working on that." },
-      ]);
+      updateChat(currentChatId, (c) => ({
+        ...c,
+        updatedAt: Date.now(),
+        messages: [...c.messages, { id: id + 1, role: "ai", text: "Got it — working on that." }],
+      }));
     }, 500);
+  }
+
+  function newChat() {
+    const id = Date.now();
+    setChats((cs) => [{ id, name: "Untitled chat", messages: [WELCOME], updatedAt: Date.now() }, ...cs]);
+    setCurrentChatId(id);
+    setPanelView("chat");
+    setInput("");
+    setPendingAttachments([]);
+  }
+
+  function openChat(id: number) {
+    setCurrentChatId(id);
+    setPanelView("chat");
+  }
+
+  function deleteChat(id: number) {
+    setChats((cs) => {
+      const next = cs.filter((c) => c.id !== id);
+      if (next.length === 0) {
+        const nid = Date.now();
+        const fresh = { id: nid, name: "Untitled chat", messages: [WELCOME], updatedAt: Date.now() };
+        setCurrentChatId(nid);
+        return [fresh];
+      }
+      if (id === currentChatId) setCurrentChatId(next[0].id);
+      return next;
+    });
+  }
+
+  function startRename() {
+    setRenameValue(currentChat.name);
+    setRenaming(true);
+  }
+  function commitRename() {
+    const v = renameValue.trim() || "Untitled chat";
+    updateChat(currentChatId, (c) => ({ ...c, name: v }));
+    setRenaming(false);
+  }
+
+  function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files) return;
+    const next: Attachment[] = Array.from(files).map((f, i) => ({
+      id: Date.now() + i,
+      name: f.name,
+      type: f.type,
+      url: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
+    }));
+    setPendingAttachments((p) => [...p, ...next]);
+    e.target.value = "";
+  }
+  function removePending(id: number) {
+    setPendingAttachments((p) => p.filter((a) => a.id !== id));
   }
 
   // Selection drawing on canvas
