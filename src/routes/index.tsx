@@ -24,8 +24,30 @@ function Studio() {
     { id: 1, role: "ai", text: "Hey — drop an image or video on the canvas, or just tell me what you want to make." },
   ]);
   const [input, setInput] = useState("");
-  
+  const [chatWidth, setChatWidth] = useState(380);
+  const draggingRef = useRef(false);
+  const shellRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!draggingRef.current || !shellRef.current) return;
+      const rect = shellRef.current.getBoundingClientRect();
+      const next = rect.right - e.clientX;
+      setChatWidth(Math.min(640, Math.max(280, next)));
+    }
+    function onUp() {
+      draggingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
