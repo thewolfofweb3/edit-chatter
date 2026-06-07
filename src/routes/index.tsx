@@ -202,7 +202,6 @@ function Studio() {
               {[
                 { id: "move", Icon: MousePointer2, label: "Move" },
                 { id: "select", Icon: SquareDashedMousePointer, label: "Highlight area" },
-                { id: "hand", Icon: Hand, label: "Pan" },
               ].map(({ id, Icon, label }) => (
                 <button
                   key={id}
