@@ -607,7 +607,7 @@ function Studio() {
             </>
           )}
         </aside>
-        )}
+
       </div>
 
 
