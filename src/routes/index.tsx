@@ -114,57 +114,13 @@ function Studio() {
 
           {/* Preview */}
           <div className="flex-1 flex items-center justify-center p-6 min-h-0">
-            <div className="relative aspect-video w-full max-w-5xl max-h-full rounded-lg overflow-hidden border border-border shadow-2xl bg-[oklch(0.08_0.003_270)]">
-              <div
-                className="absolute inset-0 opacity-60"
-                style={{
-                  background:
-                    "radial-gradient(ellipse at 30% 30%, oklch(0.35 0.12 30 / 0.5), transparent 60%), radial-gradient(ellipse at 70% 70%, oklch(0.32 0.1 260 / 0.5), transparent 60%)",
-                }}
-              />
+            <div className="relative aspect-video w-full max-w-6xl max-h-full rounded-lg overflow-hidden border border-border shadow-2xl bg-[oklch(0.08_0.003_270)]">
               <div className="absolute inset-0 grid place-items-center text-center px-6">
                 <div>
-                  <div className="mx-auto h-14 w-14 rounded-full bg-primary/15 grid place-items-center mb-3 border border-primary/30">
-                    <Sparkles className="h-6 w-6 text-primary" />
-                  </div>
-                  <p className="text-foreground/90 text-lg font-medium">Your video/image preview lives here</p>
-                  <p className="text-muted-foreground text-sm mt-1">Drop a file, or ask the AI on the right to make something.</p>
+                  <p className="text-foreground/80 text-base font-medium">Preview</p>
+                  <p className="text-muted-foreground text-sm mt-1">Your image or video will appear here.</p>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Transport / timeline */}
-          <div className="border-t border-border bg-panel">
-            <div className="h-10 px-3 flex items-center gap-3 border-b border-border">
-              <button
-                onClick={() => setPlaying((p) => !p)}
-                className="h-7 w-7 grid place-items-center rounded-md bg-accent hover:bg-accent/80 text-foreground"
-              >
-                {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-              </button>
-              <span className="font-mono text-xs text-muted-foreground tabular-nums">00:00:00 / 00:00:12</span>
-              <div className="flex-1" />
-              <button className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-                <Plus className="h-3.5 w-3.5" /> Add track
-              </button>
-            </div>
-            <div className="px-3 py-2 space-y-1.5">
-              {[
-                { name: "V1", color: "oklch(0.55 0.14 30)", w: "70%", l: "0%" },
-                { name: "V2", color: "oklch(0.5 0.12 260)", w: "40%", l: "30%" },
-                { name: "A1", color: "oklch(0.55 0.13 160)", w: "85%", l: "5%" },
-              ].map((t) => (
-                <div key={t.name} className="flex items-center gap-2">
-                  <span className="w-6 text-[10px] font-mono text-muted-foreground">{t.name}</span>
-                  <div className="relative flex-1 h-7 rounded bg-[oklch(0.16_0.004_270)] overflow-hidden">
-                    <div
-                      className="absolute top-0 bottom-0 rounded opacity-90"
-                      style={{ background: t.color, width: t.w, left: t.l }}
-                    />
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         </main>
