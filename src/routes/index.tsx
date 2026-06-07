@@ -584,13 +584,26 @@ function Studio() {
                     className="w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
                   />
                   <div className="flex items-center justify-between px-2 pb-2">
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
-                      title="Attach file"
-                    >
-                      <Paperclip className="h-4 w-4" />
-                    </button>
+                    <div className="relative" ref={plusRef}>
+                      <button
+                        onClick={() => setPlusOpen((v) => !v)}
+                        className={`p-1.5 rounded-md hover:bg-accent ${plusOpen ? "text-foreground bg-accent" : "text-muted-foreground hover:text-foreground"}`}
+                        title="Add"
+                      >
+                        <Plus className={`h-4 w-4 transition-transform ${plusOpen ? "rotate-45" : ""}`} />
+                      </button>
+                      {plusOpen && (
+                        <div className="absolute bottom-full left-0 mb-2 w-48 rounded-lg border border-border bg-popover shadow-lg p-1 z-50">
+                          <button
+                            onClick={() => { setPlusOpen(false); fileInputRef.current?.click(); }}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-accent text-left"
+                          >
+                            <Paperclip className="h-4 w-4 text-muted-foreground" />
+                            <span>Attach file</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={send}
                       className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40"
