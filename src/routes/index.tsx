@@ -3,8 +3,9 @@ import { useState, useRef, useEffect } from "react";
 import {
   Image as ImageIcon, Film, Layers, Wand2, Settings,
   Folder, Download, Upload, Send, ChevronDown,
-  MessageSquarePlus, PanelRightClose, History, Paperclip,
+  MessageSquarePlus, PanelRightClose, PanelRightOpen, History, Paperclip,
   SquareDashedMousePointer, MousePointer2,
+  ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
