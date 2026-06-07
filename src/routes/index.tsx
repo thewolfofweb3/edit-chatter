@@ -343,17 +343,18 @@ function Studio() {
         {/* Left icon rail */}
         <aside className="w-12 bg-rail border-r border-border flex flex-col items-center py-2 gap-1">
           {[
-            { Icon: ImageIcon, active: true, label: "Images" },
-            { Icon: Film, label: "Clips" },
-            { Icon: Layers, label: "Layers" },
-            { Icon: Folder, label: "Assets" },
-            { Icon: Wand2, label: "Effects" },
-          ].map(({ Icon, active, label }) => (
+            { id: "workspace", Icon: LayoutGrid, label: "Workspace" },
+            { id: "projects", Icon: Folder, label: "Projects" },
+            { id: "assets", Icon: Library, label: "Assets" },
+            { id: "templates", Icon: Sparkles, label: "Templates" },
+            { id: "history", Icon: Clock, label: "History" },
+          ].map(({ id, Icon, label }) => (
             <button
-              key={label}
+              key={id}
               title={label}
+              onClick={() => setActiveTab(id)}
               className={`h-9 w-9 grid place-items-center rounded-md transition-colors ${
-                active ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                activeTab === id ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
               }`}
             >
               <Icon className="h-[18px] w-[18px]" />
