@@ -301,17 +301,6 @@ function Studio() {
           {/* Composer */}
           <div className="p-3 border-t border-border">
             <div className="rounded-xl bg-input/60 border border-border focus-within:border-primary/60 transition-colors">
-              {pendingSel && (
-                <div className="px-3 pt-2.5">
-                  <div className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-primary/15 text-primary border border-primary/30">
-                    <SquareDashedMousePointer className="h-3.5 w-3.5" />
-                    Highlighted area attached
-                    <button onClick={() => setPendingSel(null)} className="hover:opacity-70">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              )}
               <textarea
                 ref={composerRef}
                 value={input}
@@ -323,7 +312,7 @@ function Studio() {
                   }
                 }}
                 rows={2}
-                placeholder={pendingSel ? "Ask about the highlighted area…" : "Type here — ask the AI to edit, generate, or refine…"}
+                placeholder="Type here — ask the AI to edit, generate, or refine…"
                 className="w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
               />
               <div className="flex items-center justify-between px-2 pb-2">
@@ -333,7 +322,7 @@ function Studio() {
                 <button
                   onClick={send}
                   className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40"
-                  disabled={!input.trim() && !pendingSel}
+                  disabled={!input.trim()}
                 >
                   Send <Send className="h-3 w-3" />
                 </button>
