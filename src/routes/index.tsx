@@ -330,8 +330,11 @@ function Studio() {
         </aside>
 
         {/* Workspace */}
-        <main className="flex-1 flex flex-col min-w-0 bg-canvas">
+        <main className="flex-1 flex flex-col min-w-0 bg-canvas overflow-hidden">
           <div className="relative flex-1 flex flex-col items-center justify-center p-6 pb-4 min-h-0 gap-3">
+            {previewCollapsed ? null : (
+            <>
+
             {/* Floating tool dock */}
             <div
               onMouseDown={(e) => {
