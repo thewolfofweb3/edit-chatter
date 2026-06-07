@@ -325,6 +325,13 @@ function Studio() {
           <button className="px-2.5 py-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground flex items-center gap-1.5">
             <Upload className="h-3.5 w-3.5" /> Import
           </button>
+          <button
+            onClick={() => setActiveTab("assets")}
+            title="Save to Assets"
+            className="px-2.5 py-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground flex items-center gap-1.5"
+          >
+            <Save className="h-3.5 w-3.5" /> Save
+          </button>
           <button className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-1.5 font-medium">
             <Download className="h-3.5 w-3.5" /> Export
           </button>
