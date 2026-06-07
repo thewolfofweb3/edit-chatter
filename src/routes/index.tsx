@@ -442,6 +442,27 @@ function Studio() {
                   style={{ left: selection.x, top: selection.y, width: selection.w, height: selection.h }}
                 />
               )}
+
+              {(lines.length > 0 || lineStart) && (
+                <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                  {lines.map((l, i) => (
+                    <line
+                      key={i}
+                      x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y}
+                      stroke="oklch(var(--primary))" strokeWidth={2} strokeLinecap="round"
+                    />
+                  ))}
+                  {lineStart && cursorPt && (
+                    <>
+                      <line
+                        x1={lineStart.x} y1={lineStart.y} x2={cursorPt.x} y2={cursorPt.y}
+                        stroke="oklch(var(--primary))" strokeWidth={2} strokeDasharray="4 4" strokeLinecap="round"
+                      />
+                      <circle cx={lineStart.x} cy={lineStart.y} r={4} fill="oklch(var(--primary))" />
+                    </>
+                  )}
+                </svg>
+              )}
             </div>
 
             {/* Canvas settings toolbar */}
