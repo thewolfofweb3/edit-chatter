@@ -928,7 +928,12 @@ function Studio() {
               </div>
             </>
           ) : activeTab === "projects" ? (
-            <PanelProjects projects={MOCK_PROJECTS} onOpen={() => setActiveTab("workspace")} />
+            <PanelProjects
+              projects={projects}
+              onOpen={(p) => { setProjectName(p.name); setActiveTab("workspace"); }}
+              onRename={(id, name) => setProjects((xs) => xs.map((p) => p.id === id ? { ...p, name } : p))}
+            />
+
           ) : activeTab === "assets" ? (
             <PanelAssets
               assets={assets}
