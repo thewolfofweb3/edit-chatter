@@ -62,7 +62,7 @@ const TEMPLATES: Template[] = [
   { id: "t6", name: "Mood Reel", description: "Mood-board montage with smooth crossfades.", ratio: "16 / 9", accent: "from-orange-500 to-red-500" },
 ];
 
-const MOCK_PROJECTS: Project[] = [
+const INITIAL_PROJECTS: Project[] = [
   { id: 101, name: "summer-campaign-2026", updatedAt: Date.now() - 1000 * 60 * 60 * 3, shotCount: 8 },
   { id: 102, name: "brand-intro-v2", updatedAt: Date.now() - 1000 * 60 * 60 * 26, shotCount: 4 },
   { id: 103, name: "product-launch-reel", updatedAt: Date.now() - 1000 * 60 * 60 * 72, shotCount: 12 },
