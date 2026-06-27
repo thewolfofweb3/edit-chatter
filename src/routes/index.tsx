@@ -62,7 +62,7 @@ const TEMPLATES: Template[] = [
   { id: "t6", name: "Mood Reel", description: "Mood-board montage with smooth crossfades.", ratio: "16 / 9", accent: "from-orange-500 to-red-500" },
 ];
 
-const MOCK_PROJECTS: Project[] = [
+const INITIAL_PROJECTS: Project[] = [
   { id: 101, name: "summer-campaign-2026", updatedAt: Date.now() - 1000 * 60 * 60 * 3, shotCount: 8 },
   { id: 102, name: "brand-intro-v2", updatedAt: Date.now() - 1000 * 60 * 60 * 26, shotCount: 4 },
   { id: 103, name: "product-launch-reel", updatedAt: Date.now() - 1000 * 60 * 60 * 72, shotCount: 12 },
@@ -198,6 +198,9 @@ function Studio() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [shots, setShots] = useState<Shot[]>([]);
   const [previewAssetId, setPreviewAssetId] = useState<number | null>(null);
+  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
+  const [shotPickerOpen, setShotPickerOpen] = useState(false);
+  const shotPickerRef = useRef<HTMLDivElement>(null);
 
   // Settings panel state
   const [settings, setSettings] = useState({
@@ -224,6 +227,16 @@ function Studio() {
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [plusOpen]);
+
+  useEffect(() => {
+    if (!shotPickerOpen) return;
+    function onDown(e: MouseEvent) {
+      if (shotPickerRef.current && !shotPickerRef.current.contains(e.target as Node)) setShotPickerOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [shotPickerOpen]);
+
 
   const [input, setInput] = useState("");
   const [chatWidth, setChatWidth] = useState(380);
@@ -430,44 +443,6 @@ function Studio() {
     setPendingAttachments([]);
     setIsThinking(true);
 
-    // ---- mock keyframe / video / storyboard intercept ----
-    const mockIntent = detectMockIntent(t);
-    if (mockIntent) {
-      try {
-        if (mockIntent.kind === "video") {
-          pushMessage("ai", "Generating a mock video clip…");
-          const { url, poster } = await makeMockVideo(t || "Mock clip");
-          const a = addAsset({ name: `mock-clip-${Date.now()}.webm`, kind: "video", url, poster });
-          setPreviewAssetId(a.id);
-          addShot(a.id, "Clip");
-          pushMessage("ai", "Placed a mock clip in the preview, asset library and storyboard.", [
-            { id: Date.now(), name: a.name, type: "video/webm", url: poster },
-          ]);
-        } else {
-          const n = mockIntent.count;
-          pushMessage("ai", `Generating ${n} mock keyframe${n > 1 ? "s" : ""}…`);
-          const created: Asset[] = [];
-          for (let i = 0; i < n; i++) {
-            const url = makeMockImage(`${t} #${i + 1}`);
-            const a = addAsset({ name: `keyframe-${Date.now()}-${i + 1}.png`, kind: "image", url });
-            addShot(a.id, `Shot ${shots.length + i + 1}`);
-            created.push(a);
-          }
-          const first = created[0];
-          if (first) { setPreviewAssetId(first.id); setPreviewImage(first.url); }
-          pushMessage(
-            "ai",
-            `Dropped ${n} mock keyframe${n > 1 ? "s" : ""} into your assets and storyboard.`,
-            created.slice(0, 4).map((a) => ({ id: a.id, name: a.name, type: "image/png", url: a.url })),
-          );
-        }
-      } catch (e) {
-        pushMessage("ai", `⚠️ Mock generation failed: ${e instanceof Error ? e.message : String(e)}`);
-      } finally {
-        setIsThinking(false);
-      }
-      return;
-    }
 
     try {
       const history = [...messages, { role: "user" as const, text: t }].map((m) => ({
@@ -756,12 +731,7 @@ function Studio() {
                     />
                   ) : (
                     <div className="absolute inset-0 grid place-items-center text-center px-6 pointer-events-none">
-                      <div>
-                        <p className="text-foreground/80 text-base font-medium">Preview</p>
-                        <p className="text-muted-foreground text-sm mt-1">
-                          Ask the AI to generate, or try "mock 4 keyframes" / "mock video".
-                        </p>
-                      </div>
+                      <p className="text-muted-foreground text-sm">Preview</p>
                     </div>
                   )}
 
@@ -812,123 +782,121 @@ function Studio() {
                   )}
                 </div>
 
-                {/* Canvas settings toolbar */}
-                <div className="flex items-center gap-1 text-[11px] shrink-0">
-                  <button
-                    onClick={saveCurrentToAssets}
-                    disabled={!visibleImage && !showVideo}
-                    title="Save current preview to Assets"
-                    className="px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Save className="h-3 w-3" /> Save to Assets
-                  </button>
-                  <span className="text-muted-foreground/50">·</span>
-                  <div className="relative">
-                    <button
-                      onClick={() => setMenu(menu === "size" ? null : "size")}
-                      className="px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 flex items-center gap-1"
-                    >
-                      {SIZE_PRESETS[sizeIdx].w} × {SIZE_PRESETS[sizeIdx].h}
-                      <ChevronDown className="h-3 w-3 opacity-60" />
-                    </button>
-                    {menu === "size" && (
-                      <div className="absolute bottom-full right-0 mb-1 w-56 rounded-md border border-border bg-panel shadow-lg py-1 z-20">
-                        {SIZE_PRESETS.map((p, i) => (
-                          <button
-                            key={p.label}
-                            onClick={() => { setSizeIdx(i); setMenu(null); }}
-                            className={`w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent ${i === sizeIdx ? "text-foreground" : "text-muted-foreground"}`}
-                          >
-                            {p.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-muted-foreground/50">·</span>
-                  <div className="relative">
-                    <button
-                      onClick={() => setMenu(menu === "fps" ? null : "fps")}
-                      className="px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 flex items-center gap-1"
-                    >
-                      {fps}fps
-                      <ChevronDown className="h-3 w-3 opacity-60" />
-                    </button>
-                    {menu === "fps" && (
-                      <div className="absolute bottom-full right-0 mb-1 w-32 rounded-md border border-border bg-panel shadow-lg py-1 z-20">
-                        {FPS_PRESETS.map((f) => (
-                          <button
-                            key={f}
-                            onClick={() => { setFps(f); setMenu(null); }}
-                            className={`w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent ${f === fps ? "text-foreground" : "text-muted-foreground"}`}
-                          >
-                            {f} fps
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                {/* Preview toolbar removed — to be rebuilt */}
                 </>
                 )}
               </div>
 
               {/* Storyboard strip */}
-              <div className="h-28 shrink-0 border-t border-border bg-panel/60 flex items-center gap-2 px-3 overflow-x-auto">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground w-16 shrink-0">
-                  Storyboard<br /><span className="text-foreground/70 normal-case tracking-normal">{shots.length} shots</span>
+              <div className="h-28 shrink-0 border-t border-border bg-panel/60 flex items-stretch">
+                <div className="flex flex-col justify-center px-4 shrink-0 border-r border-border min-w-[120px]">
+                  <div className="text-[11px] uppercase tracking-wider text-foreground/80 font-medium">Storyboard</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">{shots.length} shot{shots.length === 1 ? "" : "s"}</div>
                 </div>
-                {shots.length === 0 && (
-                  <div className="text-xs text-muted-foreground italic">No shots yet — try "mock storyboard with 4 shots"</div>
-                )}
-                {shots.map((s, i) => {
-                  const a = assets.find((x) => x.id === s.assetId);
-                  if (!a) return null;
-                  const active = previewAssetId === a.id;
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => selectAsset(a)}
-                      className={`relative h-20 w-32 rounded-md overflow-hidden border shrink-0 transition-all ${
-                        active ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-foreground/40"
-                      }`}
-                      title={s.label}
-                    >
-                      <img
-                        src={a.kind === "video" ? (a.poster ?? "") : a.url}
-                        alt={s.label}
-                        className="absolute inset-0 w-full h-full object-cover bg-black"
-                      />
-                      {a.kind === "video" && (
-                        <div className="absolute inset-0 grid place-items-center bg-black/30">
-                          <Play className="h-5 w-5 text-white drop-shadow" />
-                        </div>
-                      )}
-                      <div className="absolute bottom-0 inset-x-0 px-1.5 py-0.5 text-[10px] text-white bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between">
-                        <span>#{i + 1}</span>
-                        <Trash2
-                          onClick={(e) => { e.stopPropagation(); setShots((xs) => xs.filter((x) => x.id !== s.id)); }}
-                          className="h-3 w-3 opacity-60 hover:opacity-100"
-                        />
+                <div className="relative shrink-0 flex items-center px-3 border-r border-border" ref={shotPickerRef}>
+                  <button
+                    onClick={() => setShotPickerOpen((v) => !v)}
+                    className={`h-20 w-20 rounded-md border border-dashed grid place-items-center transition-colors ${
+                      shotPickerOpen ? "border-primary text-foreground bg-accent/40" : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                    }`}
+                    title="Add shot from assets"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </button>
+                  {shotPickerOpen && (
+                    <div className="absolute bottom-full left-2 mb-2 w-[320px] rounded-lg border border-border bg-popover shadow-xl z-30 overflow-hidden">
+                      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+                        <span className="text-xs font-medium">Add from Assets</span>
+                        <button
+                          onClick={() => { setShotPickerOpen(false); setActiveTab("assets"); }}
+                          className="text-[11px] text-muted-foreground hover:text-foreground"
+                        >
+                          Open Assets →
+                        </button>
                       </div>
-                    </button>
-                  );
-                })}
-                <button
-                  onClick={() => {
-                    if (!previewAsset) return;
-                    addShot(previewAsset.id, `Shot ${shots.length + 1}`);
-                  }}
-                  disabled={!previewAsset}
-                  className="h-20 w-20 shrink-0 rounded-md border border-dashed border-border hover:border-foreground/40 grid place-items-center text-muted-foreground hover:text-foreground disabled:opacity-40"
-                  title="Add current preview as shot"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
+                      <div className="max-h-64 overflow-y-auto p-2">
+                        {assets.length === 0 ? (
+                          <div className="px-2 py-6 text-center text-xs text-muted-foreground">No assets yet.</div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2">
+                            {assets.map((a) => (
+                              <button
+                                key={a.id}
+                                className="relative aspect-video rounded-md overflow-hidden border border-border hover:border-primary/60 bg-black"
+                                title={a.name}
+                              >
+                                <img
+                                  src={a.kind === "video" ? (a.poster ?? "") : a.url}
+                                  alt={a.name}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                />
+                                {a.kind === "video" && (
+                                  <div className="absolute inset-0 grid place-items-center bg-black/30">
+                                    <Play className="h-4 w-4 text-white drop-shadow" />
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="px-3 py-2 border-t border-border flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setShotPickerOpen(false)}
+                          className="h-7 px-2.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          disabled
+                          className="h-7 px-3 rounded-md bg-primary/60 text-primary-foreground text-xs font-medium opacity-60 cursor-not-allowed"
+                          title="Selection wiring coming soon"
+                        >
+                          Add selected
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 flex items-center gap-2 px-3 overflow-x-auto">
+                  {shots.length === 0 ? (
+                    <div className="text-xs text-muted-foreground/70">Empty storyboard</div>
+                  ) : (
+                    shots.map((s, i) => {
+                      const a = assets.find((x) => x.id === s.assetId);
+                      if (!a) return null;
+                      const active = previewAssetId === a.id;
+                      return (
+                        <div
+                          key={s.id}
+                          className={`relative h-20 w-32 rounded-md overflow-hidden border shrink-0 ${
+                            active ? "border-primary ring-2 ring-primary/40" : "border-border"
+                          }`}
+                          title={s.label}
+                        >
+                          <img
+                            src={a.kind === "video" ? (a.poster ?? "") : a.url}
+                            alt={s.label}
+                            className="absolute inset-0 w-full h-full object-cover bg-black"
+                          />
+                          <div className="absolute bottom-0 inset-x-0 px-1.5 py-0.5 text-[10px] text-white bg-gradient-to-t from-black/80 to-transparent">
+                            #{i + 1}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
+
             </>
           ) : activeTab === "projects" ? (
-            <PanelProjects projects={MOCK_PROJECTS} onOpen={() => setActiveTab("workspace")} />
+            <PanelProjects
+              projects={projects}
+              onOpen={(p) => { setProjectName(p.name); setActiveTab("workspace"); }}
+              onRename={(id, name) => setProjects((xs) => xs.map((p) => p.id === id ? { ...p, name } : p))}
+            />
+
           ) : activeTab === "assets" ? (
             <PanelAssets
               assets={assets}
@@ -965,6 +933,8 @@ function Studio() {
         </main>
 
 
+        {activeTab === "workspace" && (
+          <>
         {/* Resize handle */}
         <div
           onMouseDown={() => {
@@ -975,7 +945,7 @@ function Studio() {
           className="w-1 cursor-col-resize bg-border hover:bg-primary/60 transition-colors shrink-0"
         />
 
-        {/* Right: AI chat */}
+        {/* Right: AI chat (workspace only) */}
         <aside style={{ width: chatWidth }} className="bg-panel border-l border-border flex flex-col min-h-0 shrink-0 overflow-hidden">
           <div className="h-11 px-2 flex items-center justify-between border-b border-border gap-1">
             <div className="flex items-center gap-1 min-w-0">
@@ -1055,11 +1025,6 @@ function Studio() {
           ) : (
             <>
               <div key={currentChatId} ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3 animate-fade-in">
-                {messages.length === 0 && (
-                  <div className="text-xs text-muted-foreground/80 leading-relaxed border border-dashed border-border rounded-md p-3">
-                    Try: <span className="text-foreground">"mock 4 keyframes of a neon city"</span>, <span className="text-foreground">"mock video"</span>, or <span className="text-foreground">"mock storyboard with 6 shots"</span> — they'll land in your preview, assets and storyboard.
-                  </div>
-                )}
                 {messages.map((m) => (
                   <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                     <div
@@ -1136,7 +1101,7 @@ function Studio() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
                     rows={2}
-                    placeholder="Type here — ask the AI, or 'mock 4 keyframes' / 'mock video'…"
+                    placeholder="Message the AI…"
                     className="w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
                   />
                   <div className="flex items-center justify-between px-2 pb-2">
@@ -1210,6 +1175,8 @@ function Studio() {
             </>
           )}
         </aside>
+          </>
+        )}
 
       </div>
 
@@ -1239,7 +1206,20 @@ function PanelHeader({ title, subtitle, children }: { title: string; subtitle?: 
   );
 }
 
-function PanelProjects({ projects, onOpen }: { projects: Project[]; onOpen: (id: number) => void }) {
+function PanelProjects({
+  projects, onOpen, onRename,
+}: {
+  projects: Project[];
+  onOpen: (p: Project) => void;
+  onRename: (id: number, name: string) => void;
+}) {
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+  function commit(id: number) {
+    const v = draft.trim();
+    if (v) onRename(id, v);
+    setEditingId(null);
+  }
   return (
     <div className="flex-1 overflow-y-auto">
       <PanelHeader title="Projects" subtitle="Switch between workspaces or start something new.">
@@ -1249,19 +1229,43 @@ function PanelProjects({ projects, onOpen }: { projects: Project[]; onOpen: (id:
       </PanelHeader>
       <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {projects.map((p) => (
-          <button
+          <div
             key={p.id}
-            onClick={() => onOpen(p.id)}
             className="text-left rounded-lg border border-border bg-panel hover:border-primary/60 transition-colors p-4 group"
           >
-            <div className="aspect-video rounded-md bg-gradient-to-br from-primary/30 via-accent to-background mb-3 grid place-items-center">
-              <Folder className="h-7 w-7 text-foreground/60 group-hover:text-foreground" />
+            <button onClick={() => onOpen(p)} className="block w-full text-left">
+              <div className="aspect-video rounded-md bg-gradient-to-br from-primary/30 via-accent to-background mb-3 grid place-items-center">
+                <Folder className="h-7 w-7 text-foreground/60 group-hover:text-foreground" />
+              </div>
+            </button>
+            <div className="flex items-center gap-1 min-w-0">
+              {editingId === p.id ? (
+                <input
+                  autoFocus
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={() => commit(p.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commit(p.id);
+                    else if (e.key === "Escape") setEditingId(null);
+                  }}
+                  className="h-7 px-2 text-sm bg-input/60 border border-border rounded-md outline-none focus:border-primary/60 flex-1 min-w-0"
+                />
+              ) : (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDraft(p.name); setEditingId(p.id); }}
+                  className="h-7 px-2 -mx-2 flex items-center gap-1.5 rounded-md text-sm hover:bg-accent text-foreground/90 min-w-0 group/btn flex-1"
+                  title="Rename project"
+                >
+                  <span className="truncate font-medium">{p.name}</span>
+                  <Pencil className="h-3 w-3 opacity-0 group-hover/btn:opacity-60 shrink-0" />
+                </button>
+              )}
             </div>
-            <div className="font-medium text-sm truncate">{p.name}</div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
               {p.shotCount} shots · updated {new Date(p.updatedAt).toLocaleString()}
             </div>
-          </button>
+          </div>
         ))}
       </div>
     </div>
@@ -1311,7 +1315,7 @@ function PanelAssets({
       </PanelHeader>
       {filtered.length === 0 ? (
         <div className="p-12 text-center text-sm text-muted-foreground">
-          No assets yet. Upload files, or ask the chat for <span className="text-foreground">"mock 4 keyframes"</span>.
+          No assets yet. Upload files to get started.
         </div>
       ) : (
         <div className="p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

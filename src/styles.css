@@ -101,3 +101,22 @@
   display: inline-block;
   animation: thinking-dot 1.2s ease-in-out infinite;
 }
+
+/* Dark, unobtrusive scrollbars that blend with the editor surfaces */
+* {
+  scrollbar-color: oklch(0.32 0.006 270) transparent;
+  scrollbar-width: thin;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: oklch(0.32 0.006 270);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.42 0.008 270);
+  background-clip: padding-box;
+}
+
