@@ -1061,11 +1061,6 @@ function Studio() {
           ) : (
             <>
               <div key={currentChatId} ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3 animate-fade-in">
-                {messages.length === 0 && (
-                  <div className="text-xs text-muted-foreground/80 leading-relaxed border border-dashed border-border rounded-md p-3">
-                    Try: <span className="text-foreground">"mock 4 keyframes of a neon city"</span>, <span className="text-foreground">"mock video"</span>, or <span className="text-foreground">"mock storyboard with 6 shots"</span> — they'll land in your preview, assets and storyboard.
-                  </div>
-                )}
                 {messages.map((m) => (
                   <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                     <div
