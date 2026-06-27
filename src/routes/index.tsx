@@ -1247,7 +1247,20 @@ function PanelHeader({ title, subtitle, children }: { title: string; subtitle?: 
   );
 }
 
-function PanelProjects({ projects, onOpen }: { projects: Project[]; onOpen: (id: number) => void }) {
+function PanelProjects({
+  projects, onOpen, onRename,
+}: {
+  projects: Project[];
+  onOpen: (p: Project) => void;
+  onRename: (id: number, name: string) => void;
+}) {
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+  function commit(id: number) {
+    const v = draft.trim();
+    if (v) onRename(id, v);
+    setEditingId(null);
+  }
   return (
     <div className="flex-1 overflow-y-auto">
       <PanelHeader title="Projects" subtitle="Switch between workspaces or start something new.">
@@ -1257,19 +1270,43 @@ function PanelProjects({ projects, onOpen }: { projects: Project[]; onOpen: (id:
       </PanelHeader>
       <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {projects.map((p) => (
-          <button
+          <div
             key={p.id}
-            onClick={() => onOpen(p.id)}
             className="text-left rounded-lg border border-border bg-panel hover:border-primary/60 transition-colors p-4 group"
           >
-            <div className="aspect-video rounded-md bg-gradient-to-br from-primary/30 via-accent to-background mb-3 grid place-items-center">
-              <Folder className="h-7 w-7 text-foreground/60 group-hover:text-foreground" />
+            <button onClick={() => onOpen(p)} className="block w-full text-left">
+              <div className="aspect-video rounded-md bg-gradient-to-br from-primary/30 via-accent to-background mb-3 grid place-items-center">
+                <Folder className="h-7 w-7 text-foreground/60 group-hover:text-foreground" />
+              </div>
+            </button>
+            <div className="flex items-center gap-1 min-w-0">
+              {editingId === p.id ? (
+                <input
+                  autoFocus
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={() => commit(p.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commit(p.id);
+                    else if (e.key === "Escape") setEditingId(null);
+                  }}
+                  className="h-7 px-2 text-sm bg-input/60 border border-border rounded-md outline-none focus:border-primary/60 flex-1 min-w-0"
+                />
+              ) : (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDraft(p.name); setEditingId(p.id); }}
+                  className="h-7 px-2 -mx-2 flex items-center gap-1.5 rounded-md text-sm hover:bg-accent text-foreground/90 min-w-0 group/btn flex-1"
+                  title="Rename project"
+                >
+                  <span className="truncate font-medium">{p.name}</span>
+                  <Pencil className="h-3 w-3 opacity-0 group-hover/btn:opacity-60 shrink-0" />
+                </button>
+              )}
             </div>
-            <div className="font-medium text-sm truncate">{p.name}</div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
               {p.shotCount} shots · updated {new Date(p.updatedAt).toLocaleString()}
             </div>
-          </button>
+          </div>
         ))}
       </div>
     </div>
