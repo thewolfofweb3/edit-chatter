@@ -1349,7 +1349,7 @@ function PanelAssets({
       </PanelHeader>
       {filtered.length === 0 ? (
         <div className="p-12 text-center text-sm text-muted-foreground">
-          No assets yet. Upload files, or ask the chat for <span className="text-foreground">"mock 4 keyframes"</span>.
+          No assets yet. Upload files to get started.
         </div>
       ) : (
         <div className="p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
