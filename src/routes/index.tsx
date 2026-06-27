@@ -933,6 +933,8 @@ function Studio() {
         </main>
 
 
+        {activeTab === "workspace" && (
+          <>
         {/* Resize handle */}
         <div
           onMouseDown={() => {
@@ -943,7 +945,7 @@ function Studio() {
           className="w-1 cursor-col-resize bg-border hover:bg-primary/60 transition-colors shrink-0"
         />
 
-        {/* Right: AI chat */}
+        {/* Right: AI chat (workspace only) */}
         <aside style={{ width: chatWidth }} className="bg-panel border-l border-border flex flex-col min-h-0 shrink-0 overflow-hidden">
           <div className="h-11 px-2 flex items-center justify-between border-b border-border gap-1">
             <div className="flex items-center gap-1 min-w-0">
