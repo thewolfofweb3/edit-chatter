@@ -115,6 +115,8 @@
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-*::-webkit-scrollbar-thumb:hover { background: oklch(0.42 0.008 270); background-clip: padding-box;
-  animation: thinking-dot 1.2s ease-in-out infinite;
+*::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.42 0.008 270);
+  background-clip: padding-box;
 }
+
