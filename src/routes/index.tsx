@@ -759,12 +759,7 @@ function Studio() {
                     />
                   ) : (
                     <div className="absolute inset-0 grid place-items-center text-center px-6 pointer-events-none">
-                      <div>
-                        <p className="text-foreground/80 text-base font-medium">Preview</p>
-                        <p className="text-muted-foreground text-sm mt-1">
-                          Ask the AI to generate, or try "mock 4 keyframes" / "mock video".
-                        </p>
-                      </div>
+                      <p className="text-muted-foreground text-sm">Preview</p>
                     </div>
                   )}
 
