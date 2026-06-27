@@ -228,6 +228,16 @@ function Studio() {
     return () => document.removeEventListener("mousedown", onDown);
   }, [plusOpen]);
 
+  useEffect(() => {
+    if (!shotPickerOpen) return;
+    function onDown(e: MouseEvent) {
+      if (shotPickerRef.current && !shotPickerRef.current.contains(e.target as Node)) setShotPickerOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [shotPickerOpen]);
+
+
   const [input, setInput] = useState("");
   const [chatWidth, setChatWidth] = useState(380);
   const [shellWidth, setShellWidth] = useState(0);
