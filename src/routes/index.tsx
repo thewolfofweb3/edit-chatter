@@ -1137,7 +1137,7 @@ function Studio() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
                     rows={2}
-                    placeholder="Type here — ask the AI, or 'mock 4 keyframes' / 'mock video'…"
+                    placeholder="Message the AI…"
                     className="w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
                   />
                   <div className="flex items-center justify-between px-2 pb-2">
