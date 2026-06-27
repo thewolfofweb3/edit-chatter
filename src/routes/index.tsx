@@ -816,58 +816,107 @@ function Studio() {
               </div>
 
               {/* Storyboard strip */}
-              <div className="h-28 shrink-0 border-t border-border bg-panel/60 flex items-center gap-2 px-3 overflow-x-auto">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground w-16 shrink-0">
-                  Storyboard<br /><span className="text-foreground/70 normal-case tracking-normal">{shots.length} shots</span>
+              <div className="h-28 shrink-0 border-t border-border bg-panel/60 flex items-stretch">
+                <div className="flex flex-col justify-center px-4 shrink-0 border-r border-border min-w-[120px]">
+                  <div className="text-[11px] uppercase tracking-wider text-foreground/80 font-medium">Storyboard</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">{shots.length} shot{shots.length === 1 ? "" : "s"}</div>
                 </div>
-                {shots.length === 0 && (
-                  <div className="text-xs text-muted-foreground italic">No shots yet — try "mock storyboard with 4 shots"</div>
-                )}
-                {shots.map((s, i) => {
-                  const a = assets.find((x) => x.id === s.assetId);
-                  if (!a) return null;
-                  const active = previewAssetId === a.id;
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => selectAsset(a)}
-                      className={`relative h-20 w-32 rounded-md overflow-hidden border shrink-0 transition-all ${
-                        active ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-foreground/40"
-                      }`}
-                      title={s.label}
-                    >
-                      <img
-                        src={a.kind === "video" ? (a.poster ?? "") : a.url}
-                        alt={s.label}
-                        className="absolute inset-0 w-full h-full object-cover bg-black"
-                      />
-                      {a.kind === "video" && (
-                        <div className="absolute inset-0 grid place-items-center bg-black/30">
-                          <Play className="h-5 w-5 text-white drop-shadow" />
-                        </div>
-                      )}
-                      <div className="absolute bottom-0 inset-x-0 px-1.5 py-0.5 text-[10px] text-white bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between">
-                        <span>#{i + 1}</span>
-                        <Trash2
-                          onClick={(e) => { e.stopPropagation(); setShots((xs) => xs.filter((x) => x.id !== s.id)); }}
-                          className="h-3 w-3 opacity-60 hover:opacity-100"
-                        />
+                <div className="relative shrink-0 flex items-center px-3 border-r border-border" ref={shotPickerRef}>
+                  <button
+                    onClick={() => setShotPickerOpen((v) => !v)}
+                    className={`h-20 w-20 rounded-md border border-dashed grid place-items-center transition-colors ${
+                      shotPickerOpen ? "border-primary text-foreground bg-accent/40" : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                    }`}
+                    title="Add shot from assets"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </button>
+                  {shotPickerOpen && (
+                    <div className="absolute bottom-full left-2 mb-2 w-[320px] rounded-lg border border-border bg-popover shadow-xl z-30 overflow-hidden">
+                      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+                        <span className="text-xs font-medium">Add from Assets</span>
+                        <button
+                          onClick={() => { setShotPickerOpen(false); setActiveTab("assets"); }}
+                          className="text-[11px] text-muted-foreground hover:text-foreground"
+                        >
+                          Open Assets →
+                        </button>
                       </div>
-                    </button>
-                  );
-                })}
-                <button
-                  onClick={() => {
-                    if (!previewAsset) return;
-                    addShot(previewAsset.id, `Shot ${shots.length + 1}`);
-                  }}
-                  disabled={!previewAsset}
-                  className="h-20 w-20 shrink-0 rounded-md border border-dashed border-border hover:border-foreground/40 grid place-items-center text-muted-foreground hover:text-foreground disabled:opacity-40"
-                  title="Add current preview as shot"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
+                      <div className="max-h-64 overflow-y-auto p-2">
+                        {assets.length === 0 ? (
+                          <div className="px-2 py-6 text-center text-xs text-muted-foreground">No assets yet.</div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2">
+                            {assets.map((a) => (
+                              <button
+                                key={a.id}
+                                className="relative aspect-video rounded-md overflow-hidden border border-border hover:border-primary/60 bg-black"
+                                title={a.name}
+                              >
+                                <img
+                                  src={a.kind === "video" ? (a.poster ?? "") : a.url}
+                                  alt={a.name}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                />
+                                {a.kind === "video" && (
+                                  <div className="absolute inset-0 grid place-items-center bg-black/30">
+                                    <Play className="h-4 w-4 text-white drop-shadow" />
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="px-3 py-2 border-t border-border flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setShotPickerOpen(false)}
+                          className="h-7 px-2.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          disabled
+                          className="h-7 px-3 rounded-md bg-primary/60 text-primary-foreground text-xs font-medium opacity-60 cursor-not-allowed"
+                          title="Selection wiring coming soon"
+                        >
+                          Add selected
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 flex items-center gap-2 px-3 overflow-x-auto">
+                  {shots.length === 0 ? (
+                    <div className="text-xs text-muted-foreground/70">Empty storyboard</div>
+                  ) : (
+                    shots.map((s, i) => {
+                      const a = assets.find((x) => x.id === s.assetId);
+                      if (!a) return null;
+                      const active = previewAssetId === a.id;
+                      return (
+                        <div
+                          key={s.id}
+                          className={`relative h-20 w-32 rounded-md overflow-hidden border shrink-0 ${
+                            active ? "border-primary ring-2 ring-primary/40" : "border-border"
+                          }`}
+                          title={s.label}
+                        >
+                          <img
+                            src={a.kind === "video" ? (a.poster ?? "") : a.url}
+                            alt={s.label}
+                            className="absolute inset-0 w-full h-full object-cover bg-black"
+                          />
+                          <div className="absolute bottom-0 inset-x-0 px-1.5 py-0.5 text-[10px] text-white bg-gradient-to-t from-black/80 to-transparent">
+                            #{i + 1}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
+
             </>
           ) : activeTab === "projects" ? (
             <PanelProjects
