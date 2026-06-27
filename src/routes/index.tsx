@@ -810,63 +810,7 @@ function Studio() {
                   )}
                 </div>
 
-                {/* Canvas settings toolbar */}
-                <div className="flex items-center gap-1 text-[11px] shrink-0">
-                  <button
-                    onClick={saveCurrentToAssets}
-                    disabled={!visibleImage && !showVideo}
-                    title="Save current preview to Assets"
-                    className="px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Save className="h-3 w-3" /> Save to Assets
-                  </button>
-                  <span className="text-muted-foreground/50">·</span>
-                  <div className="relative">
-                    <button
-                      onClick={() => setMenu(menu === "size" ? null : "size")}
-                      className="px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 flex items-center gap-1"
-                    >
-                      {SIZE_PRESETS[sizeIdx].w} × {SIZE_PRESETS[sizeIdx].h}
-                      <ChevronDown className="h-3 w-3 opacity-60" />
-                    </button>
-                    {menu === "size" && (
-                      <div className="absolute bottom-full right-0 mb-1 w-56 rounded-md border border-border bg-panel shadow-lg py-1 z-20">
-                        {SIZE_PRESETS.map((p, i) => (
-                          <button
-                            key={p.label}
-                            onClick={() => { setSizeIdx(i); setMenu(null); }}
-                            className={`w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent ${i === sizeIdx ? "text-foreground" : "text-muted-foreground"}`}
-                          >
-                            {p.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-muted-foreground/50">·</span>
-                  <div className="relative">
-                    <button
-                      onClick={() => setMenu(menu === "fps" ? null : "fps")}
-                      className="px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 flex items-center gap-1"
-                    >
-                      {fps}fps
-                      <ChevronDown className="h-3 w-3 opacity-60" />
-                    </button>
-                    {menu === "fps" && (
-                      <div className="absolute bottom-full right-0 mb-1 w-32 rounded-md border border-border bg-panel shadow-lg py-1 z-20">
-                        {FPS_PRESETS.map((f) => (
-                          <button
-                            key={f}
-                            onClick={() => { setFps(f); setMenu(null); }}
-                            className={`w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent ${f === fps ? "text-foreground" : "text-muted-foreground"}`}
-                          >
-                            {f} fps
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                {/* Preview toolbar removed — to be rebuilt */}
                 </>
                 )}
               </div>
