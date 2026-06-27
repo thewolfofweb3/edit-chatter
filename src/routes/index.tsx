@@ -443,44 +443,6 @@ function Studio() {
     setPendingAttachments([]);
     setIsThinking(true);
 
-    // ---- mock keyframe / video / storyboard intercept ----
-    const mockIntent = detectMockIntent(t);
-    if (mockIntent) {
-      try {
-        if (mockIntent.kind === "video") {
-          pushMessage("ai", "Generating a mock video clip…");
-          const { url, poster } = await makeMockVideo(t || "Mock clip");
-          const a = addAsset({ name: `mock-clip-${Date.now()}.webm`, kind: "video", url, poster });
-          setPreviewAssetId(a.id);
-          addShot(a.id, "Clip");
-          pushMessage("ai", "Placed a mock clip in the preview, asset library and storyboard.", [
-            { id: Date.now(), name: a.name, type: "video/webm", url: poster },
-          ]);
-        } else {
-          const n = mockIntent.count;
-          pushMessage("ai", `Generating ${n} mock keyframe${n > 1 ? "s" : ""}…`);
-          const created: Asset[] = [];
-          for (let i = 0; i < n; i++) {
-            const url = makeMockImage(`${t} #${i + 1}`);
-            const a = addAsset({ name: `keyframe-${Date.now()}-${i + 1}.png`, kind: "image", url });
-            addShot(a.id, `Shot ${shots.length + i + 1}`);
-            created.push(a);
-          }
-          const first = created[0];
-          if (first) { setPreviewAssetId(first.id); setPreviewImage(first.url); }
-          pushMessage(
-            "ai",
-            `Dropped ${n} mock keyframe${n > 1 ? "s" : ""} into your assets and storyboard.`,
-            created.slice(0, 4).map((a) => ({ id: a.id, name: a.name, type: "image/png", url: a.url })),
-          );
-        }
-      } catch (e) {
-        pushMessage("ai", `⚠️ Mock generation failed: ${e instanceof Error ? e.message : String(e)}`);
-      } finally {
-        setIsThinking(false);
-      }
-      return;
-    }
 
     try {
       const history = [...messages, { role: "user" as const, text: t }].map((m) => ({
