@@ -198,6 +198,9 @@ function Studio() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [shots, setShots] = useState<Shot[]>([]);
   const [previewAssetId, setPreviewAssetId] = useState<number | null>(null);
+  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
+  const [shotPickerOpen, setShotPickerOpen] = useState(false);
+  const shotPickerRef = useRef<HTMLDivElement>(null);
 
   // Settings panel state
   const [settings, setSettings] = useState({
