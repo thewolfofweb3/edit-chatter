@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import {
   Image as ImageIcon, Film, Settings,
-  Folder, Download, Upload, Send, ChevronDown,
+  Folder, Download, Upload, Send, ChevronDown, Pause,
   MessageSquarePlus, History, Paperclip,
   SquareDashedMousePointer, MousePointer2, Plus, Brush,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
@@ -61,7 +61,6 @@ const SIZE_PRESETS: Preset[] = [
   { label: "Cinema 21:9 · 2560×1080", w: 2560, h: 1080, ratio: "21 / 9" },
   { label: "4K · 3840×2160", w: 3840, h: 2160, ratio: "16 / 9" },
 ];
-const FPS_PRESETS = [24, 30, 60];
 
 const TEMPLATES: Template[] = [
   { id: "t1", name: "Product Hero", description: "Centered product on gradient with floating bokeh.", ratio: "16 / 9", accent: "from-indigo-500 to-fuchsia-500" },
@@ -277,8 +276,7 @@ function Studio() {
   const [shellWidth, setShellWidth] = useState(0);
   const [tool, setTool] = useState<Tool>("select");
   const [sizeIdx, setSizeIdx] = useState(0);
-  const [fps, setFps] = useState(30);
-  const [menu, setMenu] = useState<null | "size" | "fps">(null);
+  const [menu, setMenu] = useState<null | "size">(null);
 
   const currentChat = chats.find((c) => c.id === currentChatId) ?? chats[0];
   const messages = currentChat?.messages ?? [];
@@ -302,8 +300,11 @@ function Studio() {
   const shellRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const typingTimersRef = useRef<ReturnType<typeof setInterval>[]>([]);
+  const sizeMenuRef = useRef<HTMLDivElement>(null);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
 
   // Tool dock dragging
   const [dockPos, setDockPos] = useState({ x: 0, y: 0 });
@@ -337,6 +338,32 @@ function Studio() {
       window.removeEventListener("mouseup", onUp);
     };
   }, []);
+
+  useEffect(() => {
+    if (menu !== "size") return;
+    function onDown(e: MouseEvent) {
+      if (sizeMenuRef.current && !sizeMenuRef.current.contains(e.target as Node)) setMenu(null);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [menu]);
+
+  useEffect(() => {
+    setIsPreviewPlaying(false);
+    videoRef.current?.pause();
+  }, [previewAssetId]);
+
+  function togglePreviewPlayback() {
+    const video = videoRef.current;
+    if (!showVideo || !video) return;
+    if (video.paused) {
+      void video.play();
+      setIsPreviewPlaying(true);
+    } else {
+      video.pause();
+      setIsPreviewPlaying(false);
+    }
+  }
 
   useEffect(() => {
     function onMove(e: MouseEvent) {
@@ -968,21 +995,24 @@ function Studio() {
                   onMouseLeave={onCanvasUp}
                   onDoubleClick={() => { setStrokes([]); setCurrentStroke(null); }}
                   style={{ aspectRatio: SIZE_PRESETS[sizeIdx].ratio }}
-                  className={`relative w-full max-w-6xl max-h-full rounded-lg overflow-hidden border border-border shadow-2xl bg-[oklch(0.08_0.003_270)] select-none ${cursorClass}`}
+                  className={`relative w-full max-w-6xl max-h-[calc(100%-54px)] rounded-lg overflow-hidden border border-border shadow-2xl bg-black select-none ring-1 ring-white/5 ${cursorClass}`}
                 >
                   {showVideo && previewAsset ? (
                     <video
+                      ref={videoRef}
                       src={previewAsset.url}
                       poster={previewAsset.poster}
-                      controls
-                      className="absolute inset-0 w-full h-full object-contain pointer-events-auto select-none bg-black"
+                      onPlay={() => setIsPreviewPlaying(true)}
+                      onPause={() => setIsPreviewPlaying(false)}
+                      onEnded={() => setIsPreviewPlaying(false)}
+                      className="absolute inset-0 h-full w-full object-contain pointer-events-none select-none bg-black"
                     />
                   ) : visibleImage ? (
                     <img
                       src={visibleImage}
                       alt="Preview"
                       draggable={false}
-                      className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+                      className="absolute inset-0 h-full w-full object-contain pointer-events-none select-none bg-black"
                     />
                   ) : (
                     <div className="absolute inset-0 grid place-items-center text-center px-6 pointer-events-none">
@@ -1037,7 +1067,41 @@ function Studio() {
                   )}
                 </div>
 
-                {/* Preview toolbar removed — to be rebuilt */}
+                <div className="relative flex h-10 items-center gap-2 rounded-lg border border-border bg-panel/80 px-2 shadow-lg backdrop-blur" ref={sizeMenuRef}>
+                  <button
+                    onClick={togglePreviewPlayback}
+                    disabled={!showVideo}
+                    title={showVideo ? (isPreviewPlaying ? "Pause preview" : "Play preview") : "Play is available when preview contains video"}
+                    className="h-8 w-8 grid place-items-center rounded-md bg-accent text-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/80"
+                  >
+                    {isPreviewPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  </button>
+                  <div className="h-5 w-px bg-border" />
+                  <button
+                    onClick={() => setMenu(menu === "size" ? null : "size")}
+                    className="h-8 min-w-[176px] justify-between rounded-md px-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                    title="Preview dimensions"
+                  >
+                    <span className="truncate">{SIZE_PRESETS[sizeIdx].label}</span>
+                    <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${menu === "size" ? "rotate-180" : ""}`} />
+                  </button>
+                  {menu === "size" && (
+                    <div className="absolute bottom-full left-10 mb-2 w-64 overflow-hidden rounded-lg border border-border bg-popover shadow-xl z-40">
+                      {SIZE_PRESETS.map((preset, idx) => (
+                        <button
+                          key={preset.label}
+                          onClick={() => { setSizeIdx(idx); setMenu(null); }}
+                          className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-accent ${
+                            idx === sizeIdx ? "bg-accent/70 text-foreground" : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <span>{preset.label}</span>
+                          <span className="text-[10px] text-muted-foreground">{preset.w}x{preset.h}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 </>
                 )}
               </div>
