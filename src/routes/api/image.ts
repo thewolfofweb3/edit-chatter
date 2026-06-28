@@ -13,6 +13,10 @@ type ImageRequest = {
   maskBase64?: string;  // white = edit region, black = keep
 };
 
+const IMAGE_MODEL = process.env.OPENROUTER_IMAGE_MODEL || "google/gemini-3-pro-image-preview";
+const HTTP_REFERER = process.env.OPENROUTER_HTTP_REFERER || "http://localhost:8080";
+const APP_TITLE = process.env.OPENROUTER_APP_TITLE || "Reel Studio";
+
 export const Route = createFileRoute("/api/image")({
   server: {
     handlers: {
@@ -34,7 +38,7 @@ export const Route = createFileRoute("/api/image")({
       POST: async ({ request }) => {
         const key = process.env.OPENROUTER_API_KEY;
         if (!key) {
-          return new Response(JSON.stringify({ error: "Missing OPENROUTER_API_KEY" }), {
+          return new Response(JSON.stringify({ error: "Missing OPENROUTER_API_KEY. Add it to .env or Codespaces secrets, then restart the dev server." }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
           });
@@ -79,11 +83,11 @@ export const Route = createFileRoute("/api/image")({
           headers: {
             Authorization: `Bearer ${key}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://lovable.dev",
-            "X-Title": "Reel Studio",
+            "HTTP-Referer": HTTP_REFERER,
+            "X-Title": APP_TITLE,
           },
           body: JSON.stringify({
-            model: "google/gemini-3-pro-image-preview",
+            model: IMAGE_MODEL,
             modalities: ["image", "text"],
             messages: [{ role: "user", content: userContent }],
           }),

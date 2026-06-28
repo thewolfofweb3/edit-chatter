@@ -4,6 +4,10 @@ import { createFileRoute } from "@tanstack/react-router";
 // for the (stub) video mode. Image generation/editing lives in /api/image.
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
+const CHAT_MODEL = process.env.OPENROUTER_CHAT_MODEL || "google/gemini-2.5-flash";
+const HTTP_REFERER = process.env.OPENROUTER_HTTP_REFERER || "http://localhost:8080";
+const APP_TITLE = process.env.OPENROUTER_APP_TITLE || "Reel Studio";
+
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
@@ -25,7 +29,7 @@ export const Route = createFileRoute("/api/chat")({
       POST: async ({ request }) => {
         const key = process.env.OPENROUTER_API_KEY;
         if (!key) {
-          return new Response(JSON.stringify({ error: "Missing OPENROUTER_API_KEY" }), {
+          return new Response(JSON.stringify({ error: "Missing OPENROUTER_API_KEY. Add it to .env or Codespaces secrets, then restart the dev server." }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
           });
@@ -55,11 +59,11 @@ export const Route = createFileRoute("/api/chat")({
           headers: {
             Authorization: `Bearer ${key}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://lovable.dev",
-            "X-Title": "Reel Studio",
+            "HTTP-Referer": HTTP_REFERER,
+            "X-Title": APP_TITLE,
           },
           body: JSON.stringify({
-            model: body.model ?? "google/gemini-2.5-flash",
+            model: body.model ?? CHAT_MODEL,
             messages,
           }),
         });

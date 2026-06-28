@@ -13,6 +13,10 @@ type RouteBody = {
   mode: "photo" | "video";
 };
 
+const ORCHESTRATOR_MODEL = process.env.OPENROUTER_ORCHESTRATOR_MODEL || "google/gemini-2.5-flash";
+const HTTP_REFERER = process.env.OPENROUTER_HTTP_REFERER || "http://localhost:8080";
+const APP_TITLE = process.env.OPENROUTER_APP_TITLE || "Reel Studio";
+
 export const Route = createFileRoute("/api/orchestrate")({
   server: {
     handlers: {
@@ -26,7 +30,7 @@ export const Route = createFileRoute("/api/orchestrate")({
       POST: async ({ request }) => {
         const key = process.env.OPENROUTER_API_KEY;
         if (!key) {
-          return new Response(JSON.stringify({ error: "Missing OPENROUTER_API_KEY" }), {
+          return new Response(JSON.stringify({ error: "Missing OPENROUTER_API_KEY. Add it to .env or Codespaces secrets, then restart the dev server." }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
           });
@@ -70,11 +74,11 @@ Context: mode=${body.mode}, hasImage=${body.hasImage}, hasMask=${body.hasMask}.`
           headers: {
             Authorization: `Bearer ${key}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://lovable.dev",
-            "X-Title": "Reel Studio",
+            "HTTP-Referer": HTTP_REFERER,
+            "X-Title": APP_TITLE,
           },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
+            model: ORCHESTRATOR_MODEL,
             messages,
             response_format: { type: "json_object" },
           }),

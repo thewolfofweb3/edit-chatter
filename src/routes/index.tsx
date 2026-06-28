@@ -45,6 +45,14 @@ type Template = { id: string; name: string; description: string; ratio: string; 
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function cleanApiError(error: unknown, fallback: string) {
+  const message = typeof error === "string" && error.trim() ? error.trim() : fallback;
+  if (message.includes("Missing OPENROUTER_API_KEY")) {
+    return "API key missing. Add OPENROUTER_API_KEY to your Codespace environment or .env file, then restart the dev server.";
+  }
+  return message;
+}
+
 const SIZE_PRESETS: Preset[] = [
   { label: "Landscape · 1920×1080", w: 1920, h: 1080, ratio: "16 / 9" },
   { label: "Portrait · 1080×1920", w: 1080, h: 1920, ratio: "9 / 16" },
@@ -593,7 +601,7 @@ function Studio() {
       });
       const decision = await routeRes.json();
       if (!routeRes.ok) {
-        pushMessage("ai", `⚠️ ${decision.error || "Orchestrator failed"}`);
+        pushMessage("ai", `Setup issue: ${cleanApiError(decision.error, "Orchestrator failed")}`);
         return;
       }
 
@@ -619,8 +627,8 @@ function Studio() {
       });
       const data = await r.json();
       if (!r.ok || !data.dataUrl) {
-        const detail = data.text ? ` — model said: "${data.text.trim()}"` : "";
-        pushMessage("ai", `⚠️ ${data.error || "Image generation failed"}${detail}\n\nTip: image models often refuse copyrighted characters. Try a descriptive prompt instead.`);
+        const detail = data.text ? ` Model said: "${data.text.trim()}"` : "";
+        pushMessage("ai", `Image request failed: ${cleanApiError(data.error, "Image generation failed")}${detail}\n\nTip: image models often refuse copyrighted characters. Try a descriptive prompt instead.`);
         return;
       }
 
@@ -640,7 +648,7 @@ function Studio() {
       ]);
     } catch (e) {
       console.error(e);
-      pushMessage("ai", `⚠️ ${e instanceof Error ? e.message : "Request failed"}`);
+      pushMessage("ai", `Request failed: ${cleanApiError(e instanceof Error ? e.message : "", "Request failed")}`);
     } finally {
       setIsThinking(false);
       setThinkingLabel("Thinking");
