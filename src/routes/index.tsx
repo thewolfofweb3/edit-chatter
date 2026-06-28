@@ -389,7 +389,6 @@ function Studio() {
     const id = Date.now() + Math.floor(Math.random() * 1000);
     setShots((xs) => [...xs, { id, assetId: a.id, label: a.name }]);
     setSelectedShotId(id);
-    selectPreviewAsset(a);
     setShotPickerOpen(false);
   }
   function toggleShotPickerAsset(id: number) {
@@ -407,9 +406,24 @@ function Studio() {
     }));
     setShots((xs) => [...xs, ...nextShots]);
     setSelectedShotId(nextShots[0].id);
-    selectPreviewAsset(selected[0]);
     setShotPickerSelectedIds([]);
     setShotPickerOpen(false);
+  }
+  function moveAssetsToStoryboard(selected: Asset[]) {
+    if (selected.length === 0) return;
+    const nextShots = selected.map((a, i) => ({
+      id: Date.now() + i + Math.floor(Math.random() * 1000),
+      assetId: a.id,
+      label: a.name,
+    }));
+    setShots((xs) => [...xs, ...nextShots]);
+    setSelectedShotId(nextShots[0].id);
+    setPreviewAssetId(null);
+    setPreviewImage(null);
+    setStrokes([]);
+    setCurrentStroke(null);
+    setSelection(null);
+    setActiveTab("workspace");
   }
   function selectAsset(a: Asset) {
     selectPreviewAsset(a);
@@ -454,16 +468,13 @@ function Studio() {
   function onAssetUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files) return;
-    let firstAsset: Asset | null = null;
     for (const f of Array.from(files)) {
       const isVideo = f.type.startsWith("video/");
       const isImage = f.type.startsWith("image/");
       if (!isVideo && !isImage) continue;
       const url = URL.createObjectURL(f);
-      const asset = addAsset({ name: f.name, kind: isVideo ? "video" : "image", url });
-      if (!firstAsset) firstAsset = asset;
+      addAsset({ name: f.name, kind: isVideo ? "video" : "image", url });
     }
-    if (firstAsset) selectPreviewAsset(firstAsset);
     e.target.value = "";
   }
 
@@ -673,12 +684,10 @@ function Studio() {
   function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files) return;
-    let firstAsset: Asset | null = null;
     const next: Attachment[] = Array.from(files).map((f, i) => {
       const url = f.type.startsWith("image/") || f.type.startsWith("video/") ? URL.createObjectURL(f) : undefined;
       if (url && (f.type.startsWith("image/") || f.type.startsWith("video/"))) {
-        const asset = addAsset({ name: f.name, kind: f.type.startsWith("video/") ? "video" : "image", url });
-        if (!firstAsset) firstAsset = asset;
+        addAsset({ name: f.name, kind: f.type.startsWith("video/") ? "video" : "image", url });
       }
       return {
         id: Date.now() + i,
@@ -688,7 +697,6 @@ function Studio() {
       };
     });
     setPendingAttachments((p) => [...p, ...next]);
-    if (firstAsset) selectPreviewAsset(firstAsset);
     e.target.value = "";
   }
   function removePending(id: number) { setPendingAttachments((p) => p.filter((a) => a.id !== id)); }
@@ -1024,10 +1032,9 @@ function Studio() {
                             draggable={false}
                             onClick={() => {
                               setSelectedShotId(s.id);
-                              selectPreviewAsset(a);
                             }}
                             className="absolute inset-0 h-full w-full"
-                            title={`Preview ${s.label}`}
+                            title={`Select ${s.label}`}
                           >
                             <img
                               draggable={false}
@@ -1071,6 +1078,7 @@ function Studio() {
               assets={assets}
               onUploadClick={() => assetUploadRef.current?.click()}
               onPreview={selectAsset}
+              onMoveToStoryboard={moveAssetsToStoryboard}
               onDelete={(id) => {
                 setAssets((xs) => xs.filter((a) => a.id !== id));
                 setShots((xs) => xs.filter((s) => s.assetId !== id));
@@ -1442,11 +1450,12 @@ function PanelProjects({
 }
 
 function PanelAssets({
-  assets, onUploadClick, onPreview, onDelete,
+  assets, onUploadClick, onPreview, onMoveToStoryboard, onDelete,
 }: {
   assets: Asset[];
   onUploadClick: () => void;
   onPreview: (a: Asset) => void;
+  onMoveToStoryboard: (assets: Asset[]) => void;
   onDelete: (id: number) => void;
 }) {
   const [q, setQ] = useState("");
@@ -1491,7 +1500,7 @@ function PanelAssets({
           <Upload className="h-3.5 w-3.5" /> Upload
         </button>
         <button
-          onClick={() => selectedAssets[0] && onPreview(selectedAssets[0])}
+          onClick={() => onMoveToStoryboard(selectedAssets)}
           disabled={selectedAssets.length === 0}
           className="h-8 px-3 rounded-md bg-accent text-foreground text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
         >
@@ -1585,19 +1594,29 @@ function PanelAssets({
                     />
                   )}
                 </div>
-                <div className="flex items-center justify-between border-t border-border px-4 py-3">
-                  <button
-                    onClick={() => toggleSelected(viewerAsset.id)}
-                    className="h-8 px-3 rounded-md bg-accent text-xs"
-                  >
-                    {selectedIds.includes(viewerAsset.id) ? "Unselect" : "Select asset"}
-                  </button>
-                  <button
-                    onClick={() => onPreview(viewerAsset)}
-                    className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium"
-                  >
-                    Open in workspace
-                  </button>
+                <div className="flex items-center justify-between gap-4 border-t border-border bg-panel px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-foreground">{viewerAsset.name}</div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                      {viewerAsset.kind === "video" ? "Video asset" : "Image asset"} - stored in Assets
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      onClick={() => toggleSelected(viewerAsset.id)}
+                      className={`h-8 px-3 rounded-md text-xs font-medium ${
+                        selectedIds.includes(viewerAsset.id) ? "bg-primary text-primary-foreground" : "bg-accent text-foreground"
+                      }`}
+                    >
+                      {selectedIds.includes(viewerAsset.id) ? "Selected" : "Select asset"}
+                    </button>
+                    <button
+                      onClick={() => onPreview(viewerAsset)}
+                      className="h-8 px-3 rounded-md border border-border bg-background/40 text-xs font-medium text-foreground hover:bg-accent"
+                    >
+                      Open as output
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
