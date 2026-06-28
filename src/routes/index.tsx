@@ -43,6 +43,8 @@ type Shot = { id: number; assetId: number; label: string };
 type Project = { id: number; name: string; updatedAt: number; shotCount: number };
 type Template = { id: string; name: string; description: string; ratio: string; accent: string };
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const SIZE_PRESETS: Preset[] = [
   { label: "Landscape · 1920×1080", w: 1920, h: 1080, ratio: "16 / 9" },
   { label: "Portrait · 1080×1920", w: 1080, h: 1920, ratio: "9 / 16" },
@@ -201,6 +203,8 @@ function Studio() {
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
   const [shotPickerOpen, setShotPickerOpen] = useState(false);
   const [dragShotId, setDragShotId] = useState<number | null>(null);
+  const [selectedShotId, setSelectedShotId] = useState<number | null>(null);
+  const [shotPickerSelectedIds, setShotPickerSelectedIds] = useState<number[]>([]);
   const shotPickerRef = useRef<HTMLDivElement>(null);
 
   // Settings panel state
@@ -259,6 +263,7 @@ function Studio() {
   // Legacy single image used for masking/edit pipeline (image only).
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isThinking, setIsThinking] = useState(false);
+  const [thinkingLabel, setThinkingLabel] = useState("Thinking");
 
   const previewAsset = assets.find((a) => a.id === previewAssetId) ?? null;
   const showVideo = previewAsset?.kind === "video";
@@ -381,8 +386,29 @@ function Studio() {
     setSelection(null);
   }
   function addAssetToStoryboard(a: Asset) {
-    addShot(a.id, a.name);
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setShots((xs) => [...xs, { id, assetId: a.id, label: a.name }]);
+    setSelectedShotId(id);
     selectPreviewAsset(a);
+    setShotPickerOpen(false);
+  }
+  function toggleShotPickerAsset(id: number) {
+    setShotPickerSelectedIds((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  }
+  function addSelectedAssetsToStoryboard() {
+    const selected = shotPickerSelectedIds
+      .map((id) => assets.find((a) => a.id === id))
+      .filter((a): a is Asset => !!a);
+    if (selected.length === 0) return;
+    const nextShots = selected.map((a, i) => ({
+      id: Date.now() + i + Math.floor(Math.random() * 1000),
+      assetId: a.id,
+      label: a.name,
+    }));
+    setShots((xs) => [...xs, ...nextShots]);
+    setSelectedShotId(nextShots[0].id);
+    selectPreviewAsset(selected[0]);
+    setShotPickerSelectedIds([]);
     setShotPickerOpen(false);
   }
   function selectAsset(a: Asset) {
@@ -397,6 +423,7 @@ function Studio() {
         const nextAsset = assets.find((a) => a.id === next[0]?.assetId);
         setPreviewImage(nextAsset?.kind === "image" ? nextAsset.url : null);
       }
+      if (selectedShotId === id) setSelectedShotId(next[0]?.id ?? null);
       return next;
     });
   }
@@ -444,7 +471,14 @@ function Studio() {
     const intent = detectMockIntent(text);
     if (!intent) return false;
 
+    setThinkingLabel("Reading the request");
+    await wait(450);
+    setThinkingLabel("Planning the shot structure");
+    await wait(650);
+
     if (intent.kind === "video") {
+      setThinkingLabel("Rendering a motion preview");
+      await wait(700);
       const video = await makeMockVideo(text);
       const asset = addAsset({ name: "mock-video.webm", kind: "video", url: video.url, poster: video.poster });
       selectPreviewAsset(asset);
@@ -454,6 +488,8 @@ function Studio() {
 
     const created: Asset[] = [];
     for (let i = 0; i < intent.count; i++) {
+      setThinkingLabel(`Creating asset ${i + 1} of ${intent.count}`);
+      await wait(350);
       const url = makeMockImage(`${text}${intent.count > 1 ? ` - ${i + 1}` : ""}`);
       created.push(addAsset({
         name: intent.kind === "storyboard" ? `storyboard-shot-${i + 1}.png` : `mock-keyframe-${i + 1}.png`,
@@ -462,15 +498,17 @@ function Studio() {
       }));
     }
 
-    if (created[0]) selectPreviewAsset(created[0]);
     if (intent.kind === "storyboard") {
-      setShots(created.map((asset, i) => ({
+      const nextShots = created.map((asset, i) => ({
         id: Date.now() + i + Math.floor(Math.random() * 1000),
         assetId: asset.id,
         label: `Shot ${i + 1}`,
-      })));
+      }));
+      setShots(nextShots);
+      setSelectedShotId(nextShots[0]?.id ?? null);
       pushMessage("ai", `Storyboard created with ${created.length} shot${created.length === 1 ? "" : "s"}.`);
     } else {
+      if (created[0]) selectPreviewAsset(created[0]);
       pushMessage("ai", `${created.length} mock keyframe${created.length === 1 ? "" : "s"} saved to Assets.`);
     }
     return true;
@@ -516,6 +554,7 @@ function Studio() {
     setInput("");
     setPendingAttachments([]);
     setIsThinking(true);
+    setThinkingLabel("Thinking");
 
     try {
       const handledMock = await runMockWorkspaceAction(t);
@@ -583,6 +622,7 @@ function Studio() {
       pushMessage("ai", `⚠️ ${e instanceof Error ? e.message : "Request failed"}`);
     } finally {
       setIsThinking(false);
+      setThinkingLabel("Thinking");
     }
   }
 
@@ -907,8 +947,10 @@ function Studio() {
                             {assets.map((a) => (
                               <button
                                 key={a.id}
-                                onClick={() => addAssetToStoryboard(a)}
-                                className="relative aspect-video rounded-md overflow-hidden border border-border hover:border-primary/60 bg-black"
+                                onClick={() => toggleShotPickerAsset(a.id)}
+                                className={`relative aspect-video rounded-md overflow-hidden border bg-black ${
+                                  shotPickerSelectedIds.includes(a.id) ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/60"
+                                }`}
                                 title={a.name}
                               >
                                 <img
@@ -921,17 +963,34 @@ function Studio() {
                                     <Play className="h-4 w-4 text-white drop-shadow" />
                                   </div>
                                 )}
+                                <div className={`absolute left-1.5 top-1.5 h-4 w-4 rounded border grid place-items-center text-[10px] ${
+                                  shotPickerSelectedIds.includes(a.id) ? "border-primary bg-primary text-primary-foreground" : "border-white/50 bg-black/40 text-white/70"
+                                }`}>
+                                </div>
                               </button>
                             ))}
                           </div>
                         )}
                       </div>
-                      <div className="px-3 py-2 border-t border-border flex items-center justify-end">
+                      <div className="px-3 py-2 border-t border-border flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-muted-foreground">
+                          {shotPickerSelectedIds.length} selected
+                        </span>
                         <button
-                          onClick={() => setShotPickerOpen(false)}
+                          onClick={() => {
+                            setShotPickerSelectedIds([]);
+                            setShotPickerOpen(false);
+                          }}
                           className="h-7 px-2.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent"
                         >
                           Cancel
+                        </button>
+                        <button
+                          onClick={addSelectedAssetsToStoryboard}
+                          disabled={shotPickerSelectedIds.length === 0}
+                          className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium disabled:opacity-40"
+                        >
+                          Add
                         </button>
                       </div>
                     </div>
@@ -944,7 +1003,7 @@ function Studio() {
                     shots.map((s, i) => {
                       const a = assets.find((x) => x.id === s.assetId);
                       if (!a) return null;
-                      const active = previewAssetId === a.id;
+                      const active = selectedShotId === s.id || previewAssetId === a.id;
                       return (
                         <div
                           key={s.id}
@@ -962,11 +1021,16 @@ function Studio() {
                           onDragEnd={() => setDragShotId(null)}
                         >
                           <button
-                            onClick={() => selectPreviewAsset(a)}
+                            draggable={false}
+                            onClick={() => {
+                              setSelectedShotId(s.id);
+                              selectPreviewAsset(a);
+                            }}
                             className="absolute inset-0 h-full w-full"
                             title={`Preview ${s.label}`}
                           >
                             <img
+                              draggable={false}
                               src={a.kind === "video" ? (a.poster ?? "") : a.url}
                               alt={s.label}
                               className="absolute inset-0 w-full h-full object-cover bg-black"
@@ -1006,7 +1070,7 @@ function Studio() {
             <PanelAssets
               assets={assets}
               onUploadClick={() => assetUploadRef.current?.click()}
-              onSelect={selectAsset}
+              onPreview={selectAsset}
               onDelete={(id) => {
                 setAssets((xs) => xs.filter((a) => a.id !== id));
                 setShots((xs) => xs.filter((s) => s.assetId !== id));
@@ -1158,8 +1222,8 @@ function Studio() {
                 ))}
                 {isThinking && (
                   <div className="flex justify-start">
-                    <div className="rounded-2xl rounded-bl-sm bg-accent px-3.5 py-2 text-sm text-muted-foreground inline-flex items-center gap-2">
-                      <span className="thinking-shimmer">Thinking</span>
+                    <div className="rounded-2xl rounded-bl-sm bg-accent px-3.5 py-2 text-sm text-muted-foreground inline-flex items-center gap-2 border border-primary/15 shadow-[0_0_22px_rgba(239,68,68,0.08)]">
+                      <span className="thinking-shimmer">{thinkingLabel}</span>
                       <span className="inline-flex gap-0.5">
                         <span className="thinking-dot" style={{ animationDelay: "0ms" }}>.</span>
                         <span className="thinking-dot" style={{ animationDelay: "150ms" }}>.</span>
@@ -1378,18 +1442,24 @@ function PanelProjects({
 }
 
 function PanelAssets({
-  assets, onUploadClick, onSelect, onDelete,
+  assets, onUploadClick, onPreview, onDelete,
 }: {
   assets: Asset[];
   onUploadClick: () => void;
-  onSelect: (a: Asset) => void;
+  onPreview: (a: Asset) => void;
   onDelete: (id: number) => void;
 }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | AssetKind>("all");
+  const [activeAssetId, setActiveAssetId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const filtered = assets.filter((a) =>
     (filter === "all" || a.kind === filter) && a.name.toLowerCase().includes(q.toLowerCase()),
   );
+  const activeAsset = assets.find((a) => a.id === activeAssetId) ?? filtered[0] ?? null;
+  function toggleSelected(id: number) {
+    setSelectedIds((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  }
   return (
     <div className="flex-1 overflow-y-auto">
       <PanelHeader title="Assets" subtitle="Everything you upload or generate lives here.">
@@ -1423,28 +1493,74 @@ function PanelAssets({
           No assets yet. Upload files to get started.
         </div>
       ) : (
-        <div className="p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {filtered.map((a) => (
-            <div key={a.id} className="group rounded-lg border border-border bg-panel overflow-hidden hover:border-primary/60 transition-colors">
-              <button onClick={() => onSelect(a)} className="block w-full aspect-video bg-black relative">
-                <img src={a.kind === "video" ? (a.poster ?? "") : a.url} alt={a.name} className="absolute inset-0 w-full h-full object-cover" />
-                {a.kind === "video" && (
-                  <div className="absolute inset-0 grid place-items-center bg-black/30">
-                    <Play className="h-6 w-6 text-white drop-shadow" />
-                  </div>
-                )}
-              </button>
-              <div className="flex items-center justify-between px-2 py-1.5 text-xs">
-                <span className="truncate">{a.name}</span>
-                <button
-                  onClick={() => onDelete(a.id)}
-                  className="opacity-0 group-hover:opacity-100 h-6 w-6 grid place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-accent shrink-0"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
+        <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-0 min-h-[calc(100vh-9rem)]">
+          <div className="p-6">
+            {selectedIds.length > 0 && (
+              <div className="mb-3 flex items-center justify-between rounded-lg border border-border bg-panel px-3 py-2 text-xs">
+                <span className="text-muted-foreground">{selectedIds.length} selected</span>
+                <button onClick={() => setSelectedIds([])} className="rounded-md px-2 py-1 hover:bg-accent">Clear</button>
               </div>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {filtered.map((a) => {
+                const selected = selectedIds.includes(a.id);
+                const active = activeAsset?.id === a.id;
+                return (
+                  <div key={a.id} className={`group rounded-lg border bg-panel overflow-hidden transition-colors ${active ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
+                    <div className="relative aspect-video bg-black">
+                      <button onClick={() => setActiveAssetId(a.id)} className="absolute inset-0 h-full w-full">
+                        <img src={a.kind === "video" ? (a.poster ?? "") : a.url} alt={a.name} className="absolute inset-0 w-full h-full object-cover" />
+                        {a.kind === "video" && (
+                          <div className="absolute inset-0 grid place-items-center bg-black/30">
+                            <Play className="h-6 w-6 text-white drop-shadow" />
+                          </div>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => toggleSelected(a.id)}
+                        className={`absolute left-2 top-2 h-5 w-5 rounded border grid place-items-center text-[10px] ${
+                          selected ? "border-primary bg-primary text-primary-foreground" : "border-white/50 bg-black/40 text-white/70"
+                        }`}
+                        title="Select asset"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between px-2 py-1.5 text-xs">
+                      <span className="truncate">{a.name}</span>
+                      <button
+                        onClick={() => onDelete(a.id)}
+                        className="opacity-0 group-hover:opacity-100 h-6 w-6 grid place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-accent shrink-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          </div>
+          <aside className="border-l border-border bg-panel/60 p-4">
+            {activeAsset ? (
+              <div className="sticky top-4">
+                <div className="aspect-video overflow-hidden rounded-lg border border-border bg-black">
+                  <img src={activeAsset.kind === "video" ? (activeAsset.poster ?? "") : activeAsset.url} alt={activeAsset.name} className="h-full w-full object-contain" />
+                </div>
+                <div className="mt-3">
+                  <div className="text-sm font-medium truncate">{activeAsset.name}</div>
+                  <div className="mt-1 text-[11px] uppercase text-muted-foreground">{activeAsset.kind}</div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button onClick={() => onPreview(activeAsset)} className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium">
+                    Open in workspace
+                  </button>
+                  <button onClick={() => toggleSelected(activeAsset.id)} className="h-8 px-3 rounded-md bg-accent text-xs">
+                    {selectedIds.includes(activeAsset.id) ? "Unselect" : "Select"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">Select an asset to inspect it.</div>
+            )}
+          </aside>
         </div>
       )}
     </div>
