@@ -200,6 +200,7 @@ function Studio() {
   const [previewAssetId, setPreviewAssetId] = useState<number | null>(null);
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
   const [shotPickerOpen, setShotPickerOpen] = useState(false);
+  const [dragShotId, setDragShotId] = useState<number | null>(null);
   const shotPickerRef = useRef<HTMLDivElement>(null);
 
   // Settings panel state
@@ -371,17 +372,45 @@ function Studio() {
   function addShot(assetId: number, label: string) {
     setShots((xs) => [...xs, { id: Date.now() + Math.floor(Math.random() * 1000), assetId, label }]);
   }
-  function addAssetToStoryboard(a: Asset) {
-    addShot(a.id, a.name);
+  function selectPreviewAsset(a: Asset) {
     setPreviewAssetId(a.id);
     if (a.kind === "image") setPreviewImage(a.url);
+    else setPreviewImage(null);
+    setStrokes([]);
+    setCurrentStroke(null);
+    setSelection(null);
+  }
+  function addAssetToStoryboard(a: Asset) {
+    addShot(a.id, a.name);
+    selectPreviewAsset(a);
     setShotPickerOpen(false);
   }
   function selectAsset(a: Asset) {
-    setPreviewAssetId(a.id);
-    if (a.kind === "image") setPreviewImage(a.url);
-    setStrokes([]); setCurrentStroke(null);
+    selectPreviewAsset(a);
     setActiveTab("workspace");
+  }
+  function removeShot(id: number) {
+    setShots((xs) => {
+      const next = xs.filter((s) => s.id !== id);
+      if (previewAssetId && !next.some((s) => s.assetId === previewAssetId)) {
+        setPreviewAssetId(next[0]?.assetId ?? null);
+        const nextAsset = assets.find((a) => a.id === next[0]?.assetId);
+        setPreviewImage(nextAsset?.kind === "image" ? nextAsset.url : null);
+      }
+      return next;
+    });
+  }
+  function moveShot(sourceId: number, targetId: number) {
+    if (sourceId === targetId) return;
+    setShots((xs) => {
+      const from = xs.findIndex((s) => s.id === sourceId);
+      const to = xs.findIndex((s) => s.id === targetId);
+      if (from < 0 || to < 0) return xs;
+      const next = [...xs];
+      const [shot] = next.splice(from, 1);
+      next.splice(to, 0, shot);
+      return next;
+    });
   }
   function saveCurrentToAssets() {
     const url = previewAsset?.url ?? previewImage;
@@ -398,14 +427,53 @@ function Studio() {
   function onAssetUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files) return;
+    let firstAsset: Asset | null = null;
     for (const f of Array.from(files)) {
       const isVideo = f.type.startsWith("video/");
       const isImage = f.type.startsWith("image/");
       if (!isVideo && !isImage) continue;
       const url = URL.createObjectURL(f);
-      addAsset({ name: f.name, kind: isVideo ? "video" : "image", url });
+      const asset = addAsset({ name: f.name, kind: isVideo ? "video" : "image", url });
+      if (!firstAsset) firstAsset = asset;
     }
+    if (firstAsset) selectPreviewAsset(firstAsset);
     e.target.value = "";
+  }
+
+  async function runMockWorkspaceAction(text: string) {
+    const intent = detectMockIntent(text);
+    if (!intent) return false;
+
+    if (intent.kind === "video") {
+      const video = await makeMockVideo(text);
+      const asset = addAsset({ name: "mock-video.webm", kind: "video", url: video.url, poster: video.poster });
+      selectPreviewAsset(asset);
+      pushMessage("ai", "Mock video created and saved to Assets.");
+      return true;
+    }
+
+    const created: Asset[] = [];
+    for (let i = 0; i < intent.count; i++) {
+      const url = makeMockImage(`${text}${intent.count > 1 ? ` - ${i + 1}` : ""}`);
+      created.push(addAsset({
+        name: intent.kind === "storyboard" ? `storyboard-shot-${i + 1}.png` : `mock-keyframe-${i + 1}.png`,
+        kind: "image",
+        url,
+      }));
+    }
+
+    if (created[0]) selectPreviewAsset(created[0]);
+    if (intent.kind === "storyboard") {
+      setShots(created.map((asset, i) => ({
+        id: Date.now() + i + Math.floor(Math.random() * 1000),
+        assetId: asset.id,
+        label: `Shot ${i + 1}`,
+      })));
+      pushMessage("ai", `Storyboard created with ${created.length} shot${created.length === 1 ? "" : "s"}.`);
+    } else {
+      pushMessage("ai", `${created.length} mock keyframe${created.length === 1 ? "" : "s"} saved to Assets.`);
+    }
+    return true;
   }
 
   async function send() {
@@ -449,8 +517,10 @@ function Studio() {
     setPendingAttachments([]);
     setIsThinking(true);
 
-
     try {
+      const handledMock = await runMockWorkspaceAction(t);
+      if (handledMock) return;
+
       const history = [...messages, { role: "user" as const, text: t }].map((m) => ({
         role: (m.role === "ai" ? "assistant" : "user") as "assistant" | "user",
         content: m.text || "(no text)",
@@ -563,13 +633,22 @@ function Studio() {
   function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files) return;
-    const next: Attachment[] = Array.from(files).map((f, i) => ({
-      id: Date.now() + i,
-      name: f.name,
-      type: f.type,
-      url: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
-    }));
+    let firstAsset: Asset | null = null;
+    const next: Attachment[] = Array.from(files).map((f, i) => {
+      const url = f.type.startsWith("image/") || f.type.startsWith("video/") ? URL.createObjectURL(f) : undefined;
+      if (url && (f.type.startsWith("image/") || f.type.startsWith("video/"))) {
+        const asset = addAsset({ name: f.name, kind: f.type.startsWith("video/") ? "video" : "image", url });
+        if (!firstAsset) firstAsset = asset;
+      }
+      return {
+        id: Date.now() + i,
+        name: f.name,
+        type: f.type,
+        url: f.type.startsWith("image/") ? url : undefined,
+      };
+    });
     setPendingAttachments((p) => [...p, ...next]);
+    if (firstAsset) selectPreviewAsset(firstAsset);
     e.target.value = "";
   }
   function removePending(id: number) { setPendingAttachments((p) => p.filter((a) => a.id !== id)); }
@@ -639,7 +718,10 @@ function Studio() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button className="px-2.5 py-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground flex items-center gap-1.5">
+          <button
+            onClick={() => assetUploadRef.current?.click()}
+            className="px-2.5 py-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground flex items-center gap-1.5"
+          >
             <Upload className="h-3.5 w-3.5" /> Import
           </button>
           <button className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-1.5 font-medium">
@@ -866,19 +948,45 @@ function Studio() {
                       return (
                         <div
                           key={s.id}
-                          className={`relative h-20 w-32 rounded-md overflow-hidden border shrink-0 ${
+                          draggable
+                          onDragStart={() => setDragShotId(s.id)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => {
+                            if (dragShotId) moveShot(dragShotId, s.id);
+                            setDragShotId(null);
+                          }}
+                          className={`group relative h-20 w-32 rounded-md overflow-hidden border shrink-0 ${
                             active ? "border-primary ring-2 ring-primary/40" : "border-border"
                           }`}
                           title={s.label}
+                          onDragEnd={() => setDragShotId(null)}
                         >
-                          <img
-                            src={a.kind === "video" ? (a.poster ?? "") : a.url}
-                            alt={s.label}
-                            className="absolute inset-0 w-full h-full object-cover bg-black"
-                          />
+                          <button
+                            onClick={() => selectPreviewAsset(a)}
+                            className="absolute inset-0 h-full w-full"
+                            title={`Preview ${s.label}`}
+                          >
+                            <img
+                              src={a.kind === "video" ? (a.poster ?? "") : a.url}
+                              alt={s.label}
+                              className="absolute inset-0 w-full h-full object-cover bg-black"
+                            />
+                            {a.kind === "video" && (
+                              <div className="absolute inset-0 grid place-items-center bg-black/25">
+                                <Play className="h-4 w-4 text-white drop-shadow" />
+                              </div>
+                            )}
+                          </button>
                           <div className="absolute bottom-0 inset-x-0 px-1.5 py-0.5 text-[10px] text-white bg-gradient-to-t from-black/80 to-transparent">
                             #{i + 1}
                           </div>
+                          <button
+                            onClick={() => removeShot(s.id)}
+                            className="absolute right-1 top-1 h-5 w-5 grid place-items-center rounded bg-black/55 text-white/80 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
+                            title="Remove shot"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
                         </div>
                       );
                     })
