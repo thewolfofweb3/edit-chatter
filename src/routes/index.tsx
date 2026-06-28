@@ -128,6 +128,20 @@ function makeMockImage(seedText: string, w = 1280, h = 720): string {
   return c.toDataURL("image/png");
 }
 
+async function resizeImageAssetDataUrl(asset: Asset, preset: Preset): Promise<string> {
+  const img = await loadImage(asset.url);
+  const c = document.createElement("canvas");
+  c.width = preset.w; c.height = preset.h;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, c.width, c.height);
+  const scale = Math.min(c.width / img.naturalWidth, c.height / img.naturalHeight);
+  const w = img.naturalWidth * scale;
+  const h = img.naturalHeight * scale;
+  ctx.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
+  return c.toDataURL("image/png");
+}
+
 async function makeMockVideo(seedText: string, w = 1280, h = 720, durationSec = 3): Promise<{ url: string; poster: string }> {
   // Build an animated WebM via MediaRecorder on a canvas.
   const c = document.createElement("canvas");
@@ -218,13 +232,19 @@ function detectMockIntent(text: string): { kind: "video" | "keyframe" | "storybo
 
 function detectRequestedPreset(text: string): number | null {
   const t = text.toLowerCase();
-  if (/\b(9\s*:\s*16|portrait|vertical|tiktok|reel|shorts)\b/.test(t)) return 1;
-  if (/\b(1\s*:\s*1|square)\b/.test(t)) return 2;
-  if (/\b(4\s*:\s*5|lookbook|poster)\b/.test(t)) return 3;
-  if (/\b(21\s*:\s*9|cinema|cinematic|ultrawide|wide\s*screen)\b/.test(t)) return 4;
-  if (/\b(4k|3840\s*x\s*2160|3840×2160)\b/.test(t)) return 5;
-  if (/\b(16\s*:\s*9|landscape|horizontal|1920\s*x\s*1080|1920×1080)\b/.test(t)) return 0;
-  return null;
+  const matches: Array<{ index: number; preset: number }> = [];
+  [
+    { preset: 1, re: /\b(9\s*:\s*16|portrait|vertical|tiktok|reel|shorts)\b/g },
+    { preset: 2, re: /\b(1\s*:\s*1|square)\b/g },
+    { preset: 3, re: /\b(4\s*:\s*5|lookbook|poster)\b/g },
+    { preset: 4, re: /\b(21\s*:\s*9|cinema|cinematic|ultrawide|wide\s*screen)\b/g },
+    { preset: 5, re: /\b(4k|3840\s*x\s*2160|3840×2160)\b/g },
+    { preset: 0, re: /\b(16\s*:\s*9|landscape|horizontal|1920\s*x\s*1080|1920×1080)\b/g },
+  ].forEach(({ preset, re }) => {
+    for (const match of t.matchAll(re)) matches.push({ index: match.index ?? 0, preset });
+  });
+  if (matches.length === 0) return null;
+  return matches.sort((a, b) => a.index - b.index)[matches.length - 1].preset;
 }
 
 function Studio() {
@@ -594,7 +614,39 @@ function Studio() {
     setShots((xs) => xs.filter((s) => s.assetId !== id));
     if (previewAssetId === id) clearPreview();
   }
-  async function handleWorkspaceCommand(text: string) {
+  function findAssetForDimensionCommand(text: string) {
+    const t = text.toLowerCase();
+    if (previewAsset?.kind === "image") return previewAsset;
+    const imageAssets = assets.filter((a) => a.kind === "image");
+    if (/\bportrait|vertical|9\s*:\s*16\b/.test(t)) {
+      const portrait = imageAssets.find((a) => (a.width ?? 16) < (a.height ?? 9));
+      if (portrait) return portrait;
+    }
+    if (/\blandscape|horizontal|16\s*:\s*9\b/.test(t)) {
+      const landscape = imageAssets.find((a) => (a.width ?? 16) > (a.height ?? 9));
+      if (landscape) return landscape;
+    }
+    return imageAssets.length === 1 ? imageAssets[0] : null;
+  }
+  async function convertAssetToPreset(asset: Asset, preset: Preset) {
+    const url = await resizeImageAssetDataUrl(asset, preset);
+    const next: Asset = {
+      ...asset,
+      url,
+      width: preset.w,
+      height: preset.h,
+      ratio: preset.ratio,
+      sizeLabel: preset.label,
+    };
+    setAssets((xs) => xs.map((a) => (a.id === asset.id ? next : a)));
+    setPreviewAssetId(next.id);
+    setPreviewImage(next.url);
+    setStrokes([]);
+    setCurrentStroke(null);
+    setSelection(null);
+    return next;
+  }
+  async function handleWorkspaceCommand(text: string, activePreset: Preset, requestedPresetIdx: number | null) {
     const t = text.toLowerCase();
     if (/\b(capabilities|what can you do|what are you able|list.*can do|workplace.*do)\b/.test(t)) {
       setThinkingLabel("Checking workspace");
@@ -620,6 +672,19 @@ function Studio() {
       return true;
     }
     const wantsClear = /\b(clear|remove|delete|empty|reset)\b/.test(t);
+    const wantsDimensionChange = requestedPresetIdx !== null && /\b(same|exact|resize|dimension|dimensions|convert|change|make it|regenerate|reframe)\b/.test(t) && /\b(asset|image|picture|output|preview)\b/.test(t);
+    if (wantsDimensionChange) {
+      setThinkingLabel("Reframing asset");
+      await wait(450);
+      const source = findAssetForDimensionCommand(t);
+      if (!source) {
+        pushMessage("ai", "Open the asset in preview first, or leave only one image asset in Assets, and I can reframe it to that size.", undefined, { typing: "deliberate" });
+        return true;
+      }
+      const next = await convertAssetToPreset(source, activePreset);
+      pushMessage("ai", `Reframed ${next.name} to ${activePreset.label}.`, undefined, { typing: "deliberate" });
+      return true;
+    }
     if (/\b(delete|remove|trash)\b/.test(t) && /\b(asset|image|picture|media|output)\b/.test(t)) {
       setThinkingLabel("Updating assets");
       await wait(350);
@@ -796,7 +861,7 @@ function Studio() {
     setThinkingLabel("Thinking");
 
     try {
-      const handledCommand = await handleWorkspaceCommand(t);
+      const handledCommand = await handleWorkspaceCommand(t, activePreset, requestedPresetIdx);
       if (handledCommand) return;
 
       const handledMock = await runMockWorkspaceAction(t, activePreset);
@@ -1932,19 +1997,19 @@ function PanelAssets({
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid min-h-0 flex-1 place-items-center bg-black/70 p-3">
+                <div className="grid h-[calc(92vh-92px)] min-h-0 place-items-center overflow-hidden bg-black/70 p-3">
                   {viewerAsset.kind === "video" ? (
                     <video
                       src={viewerAsset.url}
                       poster={viewerAsset.poster}
                       controls
-                      className="max-h-full max-w-full rounded-lg object-contain"
+                      className="block h-auto max-h-full w-auto max-w-full rounded-lg object-contain"
                     />
                   ) : (
                     <img
                       src={viewerAsset.url}
                       alt={viewerAsset.name}
-                      className="max-h-full max-w-full rounded-lg object-contain"
+                      className="block h-auto max-h-full w-auto max-w-full rounded-lg object-contain"
                     />
                   )}
                 </div>
