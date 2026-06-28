@@ -202,6 +202,17 @@ function detectMockIntent(text: string): { kind: "video" | "keyframe" | "storybo
   return { kind: "keyframe", count };
 }
 
+function detectRequestedPreset(text: string): number | null {
+  const t = text.toLowerCase();
+  if (/\b(9\s*:\s*16|portrait|vertical|tiktok|reel|shorts)\b/.test(t)) return 1;
+  if (/\b(1\s*:\s*1|square)\b/.test(t)) return 2;
+  if (/\b(4\s*:\s*5|lookbook|poster)\b/.test(t)) return 3;
+  if (/\b(21\s*:\s*9|cinema|cinematic|ultrawide|wide\s*screen)\b/.test(t)) return 4;
+  if (/\b(4k|3840\s*x\s*2160|3840×2160)\b/.test(t)) return 5;
+  if (/\b(16\s*:\s*9|landscape|horizontal|1920\s*x\s*1080|1920×1080)\b/.test(t)) return 0;
+  return null;
+}
+
 function Studio() {
   const [chats, setChats] = useState<Chat[]>([
     { id: 1, name: "Untitled chat", messages: [], updatedAt: Date.now() },
@@ -277,6 +288,7 @@ function Studio() {
   const [tool, setTool] = useState<Tool>("select");
   const [sizeIdx, setSizeIdx] = useState(0);
   const [menu, setMenu] = useState<null | "size">(null);
+  const selectedPreset = SIZE_PRESETS[sizeIdx];
 
   const currentChat = chats.find((c) => c.id === currentChatId) ?? chats[0];
   const messages = currentChat?.messages ?? [];
@@ -298,6 +310,7 @@ function Studio() {
 
   const draggingRef = useRef(false);
   const shellRef = useRef<HTMLDivElement>(null);
+  const previewAreaRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -305,6 +318,7 @@ function Studio() {
   const typingTimersRef = useRef<ReturnType<typeof setInterval>[]>([]);
   const sizeMenuRef = useRef<HTMLDivElement>(null);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
+  const [previewAreaSize, setPreviewAreaSize] = useState({ w: 0, h: 0 });
 
   // Tool dock dragging
   const [dockPos, setDockPos] = useState({ x: 0, y: 0 });
@@ -404,8 +418,25 @@ function Studio() {
     return () => ro.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (!previewAreaRef.current) return;
+    const el = previewAreaRef.current;
+    const update = () => setPreviewAreaSize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [activeTab, chatWidth]);
+
   const previewWidth = Math.max(0, shellWidth - 48 - 4 - chatWidth);
   const previewCollapsed = shellWidth > 0 && previewWidth < 240;
+  const previewRatio = selectedPreset.w / selectedPreset.h;
+  const previewMaxWidth = Math.max(260, Math.min(1152, previewAreaSize.w - 48));
+  const previewMaxHeight = Math.max(220, previewAreaSize.h - 98);
+  const previewFrame =
+    previewMaxWidth / previewMaxHeight > previewRatio
+      ? { width: previewMaxHeight * previewRatio, height: previewMaxHeight }
+      : { width: previewMaxWidth, height: previewMaxWidth / previewRatio };
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -605,7 +636,7 @@ function Studio() {
     e.target.value = "";
   }
 
-  async function runMockWorkspaceAction(text: string) {
+  async function runMockWorkspaceAction(text: string, preset: Preset = selectedPreset) {
     const intent = detectMockIntent(text);
     if (!intent) return false;
 
@@ -628,7 +659,7 @@ function Studio() {
     for (let i = 0; i < intent.count; i++) {
       setThinkingLabel(`Creating asset ${i + 1} of ${intent.count}`);
       await wait(350);
-      const url = makeMockImage(`${text}${intent.count > 1 ? ` - ${i + 1}` : ""}`);
+      const url = makeMockImage(`${text}${intent.count > 1 ? ` - ${i + 1}` : ""}`, preset.w, preset.h);
       created.push(addAsset({
         name: intent.kind === "storyboard" ? `storyboard-shot-${i + 1}.png` : `mock-keyframe-${i + 1}.png`,
         kind: "image",
@@ -656,6 +687,10 @@ function Studio() {
   async function send() {
     const t = input.trim();
     if ((!t && pendingAttachments.length === 0) || isThinking) return;
+
+    const requestedPresetIdx = detectRequestedPreset(t);
+    const activePreset = requestedPresetIdx !== null ? SIZE_PRESETS[requestedPresetIdx] : selectedPreset;
+    if (requestedPresetIdx !== null && requestedPresetIdx !== sizeIdx) setSizeIdx(requestedPresetIdx);
 
     const hasStrokes = strokes.length > 0 && !!visibleImage && !showVideo;
     const userAtts: Attachment[] = [...pendingAttachments];
@@ -699,7 +734,7 @@ function Studio() {
       const handledCommand = await handleWorkspaceCommand(t);
       if (handledCommand) return;
 
-      const handledMock = await runMockWorkspaceAction(t);
+      const handledMock = await runMockWorkspaceAction(t, activePreset);
       if (handledMock) return;
 
       const history = [...messages, { role: "user" as const, text: t }].map((m) => ({
@@ -721,6 +756,7 @@ function Studio() {
             assetCount: assets.length,
             shotCount: shots.length,
             previewState: showVideo ? "video" : visibleImage ? "image" : "empty",
+            requestedSize: activePreset.label,
             selectedShotLabel: shots.find((s) => s.id === selectedShotId)?.label ?? null,
             assetNames: assets.slice(0, 24).map((a) => a.name),
             storyboardLabels: shots.slice(0, 24).map((s) => s.label),
@@ -741,13 +777,14 @@ function Studio() {
       if (decision.reply) pushMessage("ai", decision.reply);
 
       const isEdit = !!decision.isEdit && !!visibleImage && hasStrokes;
-      const imgPrompt: string = decision.prompt || t;
+      const imgPrompt = `${decision.prompt || t}\n\nOutput format: ${activePreset.label}. Compose for ${activePreset.w}x${activePreset.h} (${activePreset.ratio}) and fill the frame edge to edge without letterboxing or empty borders.`;
 
       const r = await fetch("/api/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: imgPrompt,
+          size: { width: activePreset.w, height: activePreset.h, ratio: activePreset.ratio, label: activePreset.label },
           mode: isEdit ? "edit" : "generate",
           imageBase64: isEdit && visibleImage ? dataUrlToBase64(visibleImage) : undefined,
           maskBase64: isEdit && maskDataUrl ? dataUrlToBase64(maskDataUrl) : undefined,
@@ -960,7 +997,7 @@ function Studio() {
         <main className="flex-1 flex flex-col min-w-0 bg-canvas overflow-hidden">
           {activeTab === "workspace" ? (
             <>
-              <div className="relative flex-1 flex flex-col items-center justify-center p-6 pb-4 min-h-0 gap-3">
+              <div ref={previewAreaRef} className="relative flex-1 flex flex-col items-center justify-center p-6 pb-4 min-h-0 gap-3">
                 {previewCollapsed ? null : (
                 <>
                 {/* Floating tool dock */}
@@ -994,8 +1031,8 @@ function Studio() {
                   onMouseUp={onCanvasUp}
                   onMouseLeave={onCanvasUp}
                   onDoubleClick={() => { setStrokes([]); setCurrentStroke(null); }}
-                  style={{ aspectRatio: SIZE_PRESETS[sizeIdx].ratio }}
-                  className={`relative w-full max-w-6xl max-h-[calc(100%-54px)] rounded-lg overflow-hidden border border-border shadow-2xl bg-black select-none ring-1 ring-white/5 ${cursorClass}`}
+                  style={{ width: previewFrame.width, height: previewFrame.height }}
+                  className={`relative rounded-lg overflow-hidden border border-border shadow-2xl bg-black select-none ring-1 ring-white/5 ${cursorClass}`}
                 >
                   {showVideo && previewAsset ? (
                     <video
@@ -1005,14 +1042,14 @@ function Studio() {
                       onPlay={() => setIsPreviewPlaying(true)}
                       onPause={() => setIsPreviewPlaying(false)}
                       onEnded={() => setIsPreviewPlaying(false)}
-                      className="absolute inset-0 h-full w-full object-contain pointer-events-none select-none bg-black"
+                      className="absolute inset-0 h-full w-full object-cover pointer-events-none select-none bg-black"
                     />
                   ) : visibleImage ? (
                     <img
                       src={visibleImage}
                       alt="Preview"
                       draggable={false}
-                      className="absolute inset-0 h-full w-full object-contain pointer-events-none select-none bg-black"
+                      className="absolute inset-0 h-full w-full object-cover pointer-events-none select-none bg-black"
                     />
                   ) : (
                     <div className="absolute inset-0 grid place-items-center text-center px-6 pointer-events-none">
@@ -1082,7 +1119,7 @@ function Studio() {
                     className="h-8 min-w-[176px] justify-between rounded-md px-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
                     title="Preview dimensions"
                   >
-                    <span className="truncate">{SIZE_PRESETS[sizeIdx].label}</span>
+                    <span className="truncate">{selectedPreset.label}</span>
                     <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${menu === "size" ? "rotate-180" : ""}`} />
                   </button>
                   {menu === "size" && (
@@ -1273,7 +1310,8 @@ function Studio() {
               onUse={(tpl) => {
                 const idx = SIZE_PRESETS.findIndex((p) => p.ratio === tpl.ratio);
                 if (idx >= 0) setSizeIdx(idx);
-                const url = makeMockImage(tpl.name);
+                const tplPreset = SIZE_PRESETS[idx >= 0 ? idx : sizeIdx];
+                const url = makeMockImage(tpl.name, tplPreset.w, tplPreset.h);
                 const a = addAsset({ name: `${tpl.name}.png`, kind: "image", url });
                 setPreviewAssetId(a.id); setPreviewImage(url);
                 setActiveTab("workspace");

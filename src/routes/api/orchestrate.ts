@@ -17,6 +17,7 @@ type RouteBody = {
     assetCount?: number;
     shotCount?: number;
     previewState?: "empty" | "image" | "video";
+    requestedSize?: string;
     selectedShotLabel?: string | null;
     assetNames?: string[];
     storyboardLabels?: string[];
@@ -83,6 +84,7 @@ Current workspace state:
 - mode=${body.mode}
 - hasPreview=${body.hasImage ? "yes" : "no"}
 - previewState=${workspace?.previewState ?? (body.hasImage ? "image" : "empty")}
+- requestedSize=${workspace?.requestedSize ?? "not specified"}
 - hasMask=${body.hasMask}
 - assetCount=${workspace?.assetCount ?? "unknown"}
 - shotCount=${workspace?.shotCount ?? "unknown"}
