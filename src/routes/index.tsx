@@ -395,7 +395,7 @@ function Studio() {
     setChats((cs) => cs.map((c) => (c.id === id ? updater(c) : c)));
   }
 
-  function pushMessage(role: "user" | "ai", text: string, attachments?: Attachment[]) {
+  function pushMessage(role: "user" | "ai", text: string, attachments?: Attachment[], options?: { typing?: "normal" | "deliberate" }) {
     const id = Date.now() + Math.floor(Math.random() * 1000);
     const chatId = currentChatId;
     if (role === "ai" && text) {
@@ -405,7 +405,8 @@ function Studio() {
         messages: [...c.messages, { id, role, text: "", attachments }],
       }));
       let cursor = 0;
-      const step = Math.max(1, text.length > 220 ? 4 : text.length > 90 ? 3 : 2);
+      const deliberate = options?.typing === "deliberate";
+      const step = deliberate ? (text.length > 260 ? 3 : 2) : Math.max(1, text.length > 220 ? 4 : text.length > 90 ? 3 : 2);
       const timer = setInterval(() => {
         cursor = Math.min(text.length, cursor + step);
         updateChat(chatId, (c) => ({
@@ -417,7 +418,7 @@ function Studio() {
           clearInterval(timer);
           typingTimersRef.current = typingTimersRef.current.filter((t) => t !== timer);
         }
-      }, 22);
+      }, deliberate ? 34 : 22);
       typingTimersRef.current.push(timer);
       return id;
     }
@@ -491,9 +492,11 @@ function Studio() {
     clearPreview();
     setActiveTab("workspace");
   }
-  function handleWorkspaceCommand(text: string) {
+  async function handleWorkspaceCommand(text: string) {
     const t = text.toLowerCase();
     if (/\b(capabilities|what can you do|what are you able|list.*can do|workplace.*do)\b/.test(t)) {
+      setThinkingLabel("Checking workspace");
+      await wait(550);
       pushMessage("ai", [
         `Right now in ${projectName}, I can help operate the workspace around the Assets -> Storyboard -> Preview flow.`,
         "",
@@ -504,19 +507,23 @@ function Studio() {
         "Assets are stored references. Storyboard is the input/context rail. Preview is the output stage.",
         "",
         "Next controls to wire: finding assets by name, adding named assets to the storyboard from chat, reordering shots from chat, and sending storyboard context into real image/video APIs.",
-      ].join("\n"));
+      ].join("\n"), undefined, { typing: "deliberate" });
       return true;
     }
     const wantsClear = /\b(clear|remove|delete|empty|reset)\b/.test(t);
     if (wantsClear && /\bpreview|output|canvas|stage\b/.test(t)) {
+      setThinkingLabel("Updating preview");
+      await wait(350);
       clearPreview();
-      pushMessage("ai", "Cleared the preview.");
+      pushMessage("ai", "Cleared the preview.", undefined, { typing: "deliberate" });
       return true;
     }
     if (wantsClear && /\bstoryboard|story\s*board|shots?\b/.test(t)) {
+      setThinkingLabel("Updating storyboard");
+      await wait(350);
       setShots([]);
       setSelectedShotId(null);
-      pushMessage("ai", "Cleared the storyboard.");
+      pushMessage("ai", "Cleared the storyboard.", undefined, { typing: "deliberate" });
       return true;
     }
     return false;
@@ -656,7 +663,7 @@ function Studio() {
     setThinkingLabel("Thinking");
 
     try {
-      const handledCommand = handleWorkspaceCommand(t);
+      const handledCommand = await handleWorkspaceCommand(t);
       if (handledCommand) return;
 
       const handledMock = await runMockWorkspaceAction(t);
