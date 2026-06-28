@@ -589,6 +589,11 @@ function Studio() {
     clearPreview();
     setActiveTab("workspace");
   }
+  function deleteAssetById(id: number) {
+    setAssets((xs) => xs.filter((a) => a.id !== id));
+    setShots((xs) => xs.filter((s) => s.assetId !== id));
+    if (previewAssetId === id) clearPreview();
+  }
   async function handleWorkspaceCommand(text: string) {
     const t = text.toLowerCase();
     if (/\b(capabilities|what can you do|what are you able|list.*can do|workplace.*do)\b/.test(t)) {
@@ -603,6 +608,7 @@ function Studio() {
         "- Help plan scenes, shots, trailers, anime sequences, and cinematic prompts",
         "- Create mock storyboard/keyframe/video placeholders for planning",
         "- Clear the preview/output or clear the storyboard when you ask",
+        "- Delete the current preview asset, or the only asset if there is just one",
         "- Explain how Assets, Storyboard, Preview, drawing tools, and Chat work together",
         "",
         "**Planned next:**",
@@ -614,6 +620,18 @@ function Studio() {
       return true;
     }
     const wantsClear = /\b(clear|remove|delete|empty|reset)\b/.test(t);
+    if (/\b(delete|remove|trash)\b/.test(t) && /\b(asset|image|picture|media|output)\b/.test(t)) {
+      setThinkingLabel("Updating assets");
+      await wait(350);
+      const target = previewAsset ?? (assets.length === 1 ? assets[0] : null);
+      if (!target) {
+        pushMessage("ai", "I need a specific asset selected or opened in preview before I delete one.", undefined, { typing: "deliberate" });
+        return true;
+      }
+      deleteAssetById(target.id);
+      pushMessage("ai", `Deleted ${target.name} from Assets${shots.some((s) => s.assetId === target.id) ? " and removed it from the storyboard" : ""}.`, undefined, { typing: "deliberate" });
+      return true;
+    }
     if (wantsClear && /\bpreview|output|canvas|stage\b/.test(t)) {
       setThinkingLabel("Updating preview");
       await wait(350);
@@ -1359,11 +1377,7 @@ function Studio() {
               assets={assets}
               onUploadClick={() => assetUploadRef.current?.click()}
               onMoveToStoryboard={moveAssetsToStoryboard}
-              onDelete={(id) => {
-                setAssets((xs) => xs.filter((a) => a.id !== id));
-                setShots((xs) => xs.filter((s) => s.assetId !== id));
-                if (previewAssetId === id) setPreviewAssetId(null);
-              }}
+              onDelete={deleteAssetById}
             />
           ) : activeTab === "templates" ? (
             <PanelTemplates
@@ -1865,7 +1879,7 @@ function PanelAssets({
                 const selected = selectedIds.includes(a.id);
                 return (
                   <div key={a.id} className={`group rounded-lg border bg-panel overflow-hidden transition-colors ${selected ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
-                    <div className="relative bg-black" style={{ aspectRatio: a.ratio ?? "16 / 9" }}>
+                    <div className="relative aspect-video bg-black">
                       <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 h-full w-full">
                         <img src={a.kind === "video" ? (a.poster ?? "") : a.url} alt={a.name} className="absolute inset-0 w-full h-full object-cover" />
                         {a.kind === "video" && (
