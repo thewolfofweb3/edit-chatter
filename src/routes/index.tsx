@@ -446,15 +446,18 @@ function Studio() {
     setCurrentStroke(null);
     setSelection(null);
   }
-  function addAssetToStoryboard(a: Asset) {
-    const id = Date.now() + Math.floor(Math.random() * 1000);
-    setShots((xs) => [...xs, { id, assetId: a.id, label: a.name }]);
-    setSelectedShotId(id);
+  function clearPreview() {
     setPreviewAssetId(null);
     setPreviewImage(null);
     setStrokes([]);
     setCurrentStroke(null);
     setSelection(null);
+  }
+  function addAssetToStoryboard(a: Asset) {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setShots((xs) => [...xs, { id, assetId: a.id, label: a.name }]);
+    setSelectedShotId(id);
+    clearPreview();
     setShotPickerOpen(false);
   }
   function toggleShotPickerAsset(id: number) {
@@ -472,11 +475,7 @@ function Studio() {
     }));
     setShots((xs) => [...xs, ...nextShots]);
     setSelectedShotId(nextShots[0].id);
-    setPreviewAssetId(null);
-    setPreviewImage(null);
-    setStrokes([]);
-    setCurrentStroke(null);
-    setSelection(null);
+    clearPreview();
     setShotPickerSelectedIds([]);
     setShotPickerOpen(false);
   }
@@ -489,16 +488,24 @@ function Studio() {
     }));
     setShots((xs) => [...xs, ...nextShots]);
     setSelectedShotId(nextShots[0].id);
-    setPreviewAssetId(null);
-    setPreviewImage(null);
-    setStrokes([]);
-    setCurrentStroke(null);
-    setSelection(null);
+    clearPreview();
     setActiveTab("workspace");
   }
-  function selectAsset(a: Asset) {
-    selectPreviewAsset(a);
-    setActiveTab("workspace");
+  function handleWorkspaceCommand(text: string) {
+    const t = text.toLowerCase();
+    const wantsClear = /\b(clear|remove|delete|empty|reset)\b/.test(t);
+    if (wantsClear && /\bpreview|output|canvas|stage\b/.test(t)) {
+      clearPreview();
+      pushMessage("ai", "Cleared the preview.");
+      return true;
+    }
+    if (wantsClear && /\bstoryboard|story\s*board|shots?\b/.test(t)) {
+      setShots([]);
+      setSelectedShotId(null);
+      pushMessage("ai", "Cleared the storyboard.");
+      return true;
+    }
+    return false;
   }
   function removeShot(id: number) {
     setShots((xs) => {
@@ -583,11 +590,7 @@ function Studio() {
       }));
       setShots(nextShots);
       setSelectedShotId(nextShots[0]?.id ?? null);
-      setPreviewAssetId(null);
-      setPreviewImage(null);
-      setStrokes([]);
-      setCurrentStroke(null);
-      setSelection(null);
+      clearPreview();
       pushMessage("ai", `Storyboard created with ${created.length} shot${created.length === 1 ? "" : "s"}.`);
     } else {
       if (created[0]) selectPreviewAsset(created[0]);
@@ -639,6 +642,9 @@ function Studio() {
     setThinkingLabel("Thinking");
 
     try {
+      const handledCommand = handleWorkspaceCommand(t);
+      if (handledCommand) return;
+
       const handledMock = await runMockWorkspaceAction(t);
       if (handledMock) return;
 
@@ -1148,7 +1154,6 @@ function Studio() {
             <PanelAssets
               assets={assets}
               onUploadClick={() => assetUploadRef.current?.click()}
-              onPreview={selectAsset}
               onMoveToStoryboard={moveAssetsToStoryboard}
               onDelete={(id) => {
                 setAssets((xs) => xs.filter((a) => a.id !== id));
@@ -1300,8 +1305,8 @@ function Studio() {
                   </div>
                 ))}
                 {isThinking && (
-                  <div className="flex justify-start">
-                    <div className="rounded-2xl rounded-bl-sm bg-accent px-3.5 py-2 text-sm text-muted-foreground inline-flex items-center gap-2 border border-primary/15 shadow-[0_0_22px_rgba(239,68,68,0.08)]">
+                  <div className="flex justify-start px-1">
+                    <div className="px-1 py-1 text-sm text-muted-foreground inline-flex items-center gap-2">
                       <span className="thinking-shimmer">{thinkingLabel}</span>
                       <span className="inline-flex gap-0.5">
                         <span className="thinking-dot" style={{ animationDelay: "0ms" }}>.</span>
@@ -1521,11 +1526,10 @@ function PanelProjects({
 }
 
 function PanelAssets({
-  assets, onUploadClick, onPreview, onMoveToStoryboard, onDelete,
+  assets, onUploadClick, onMoveToStoryboard, onDelete,
 }: {
   assets: Asset[];
   onUploadClick: () => void;
-  onPreview: (a: Asset) => void;
   onMoveToStoryboard: (assets: Asset[]) => void;
   onDelete: (id: number) => void;
 }) {
@@ -1682,10 +1686,13 @@ function PanelAssets({
                       {selectedIds.includes(viewerAsset.id) ? "Selected" : "Select asset"}
                     </button>
                     <button
-                      onClick={() => onPreview(viewerAsset)}
+                      onClick={() => {
+                        onMoveToStoryboard([viewerAsset]);
+                        setViewerAssetId(null);
+                      }}
                       className="h-8 px-3 rounded-md border border-border bg-background/40 text-xs font-medium text-foreground hover:bg-accent"
                     >
-                      Open as output
+                      Add to storyboard
                     </button>
                   </div>
                 </div>
