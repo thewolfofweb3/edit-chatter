@@ -493,6 +493,20 @@ function Studio() {
   }
   function handleWorkspaceCommand(text: string) {
     const t = text.toLowerCase();
+    if (/\b(capabilities|what can you do|what are you able|list.*can do|workplace.*do)\b/.test(t)) {
+      pushMessage("ai", [
+        `Right now in ${projectName}, I can help operate the workspace around the Assets -> Storyboard -> Preview flow.`,
+        "",
+        `Current state: ${assets.length} asset${assets.length === 1 ? "" : "s"}, ${shots.length} storyboard shot${shots.length === 1 ? "" : "s"}, preview is ${showVideo ? "showing a video output" : visibleImage ? "showing an image output" : "empty"}.`,
+        "",
+        "I can help you plan scenes, write cinematic prompts, create mock storyboard/keyframe assets, explain or organize the storyboard, and clear the preview or storyboard when you ask.",
+        "",
+        "Assets are stored references. Storyboard is the input/context rail. Preview is the output stage.",
+        "",
+        "Next controls to wire: finding assets by name, adding named assets to the storyboard from chat, reordering shots from chat, and sending storyboard context into real image/video APIs.",
+      ].join("\n"));
+      return true;
+    }
     const wantsClear = /\b(clear|remove|delete|empty|reset)\b/.test(t);
     if (wantsClear && /\bpreview|output|canvas|stage\b/.test(t)) {
       clearPreview();
@@ -656,7 +670,22 @@ function Studio() {
       const routeRes = await fetch("/api/orchestrate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history, hasImage: !!visibleImage, hasMask: hasStrokes, mode }),
+        body: JSON.stringify({
+          messages: history,
+          hasImage: !!visibleImage,
+          hasMask: hasStrokes,
+          mode,
+          workspace: {
+            projectName,
+            activeTab,
+            assetCount: assets.length,
+            shotCount: shots.length,
+            previewState: showVideo ? "video" : visibleImage ? "image" : "empty",
+            selectedShotLabel: shots.find((s) => s.id === selectedShotId)?.label ?? null,
+            assetNames: assets.slice(0, 24).map((a) => a.name),
+            storyboardLabels: shots.slice(0, 24).map((s) => s.label),
+          },
+        }),
       });
       const decision = await routeRes.json();
       if (!routeRes.ok) {
