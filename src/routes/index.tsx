@@ -7,7 +7,7 @@ import {
   SquareDashedMousePointer, MousePointer2, Plus, Brush,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
   LayoutGrid, Library, Save, LayoutTemplate,
-  Target, Play, Sparkles, Search,
+  Target, Play, Sparkles, Search, CheckCircle2, Clock3, Wand2,
 } from "lucide-react";
 import { buildMaskDataUrl, compositeWithMask, dataUrlToBase64, loadImage } from "@/lib/imageOps";
 
@@ -498,15 +498,21 @@ function Studio() {
       setThinkingLabel("Checking workspace");
       await wait(550);
       pushMessage("ai", [
-        `Right now in ${projectName}, I can help operate the workspace around the Assets -> Storyboard -> Preview flow.`,
+        `Reel Studio is set up around the Assets -> Storyboard -> Preview flow.`,
         "",
-        `Current state: ${assets.length} asset${assets.length === 1 ? "" : "s"}, ${shots.length} storyboard shot${shots.length === 1 ? "" : "s"}, preview is ${showVideo ? "showing a video output" : visibleImage ? "showing an image output" : "empty"}.`,
+        "**Right now, I can:**",
+        `- Track this project: ${projectName}`,
+        `- Read the current workspace state: ${assets.length} asset${assets.length === 1 ? "" : "s"}, ${shots.length} storyboard shot${shots.length === 1 ? "" : "s"}, preview is ${showVideo ? "showing a video output" : visibleImage ? "showing an image output" : "empty"}`,
+        "- Help plan scenes, shots, trailers, anime sequences, and cinematic prompts",
+        "- Create mock storyboard/keyframe/video placeholders for planning",
+        "- Clear the preview/output or clear the storyboard when you ask",
+        "- Explain how Assets, Storyboard, Preview, drawing tools, and Chat work together",
         "",
-        "I can help you plan scenes, write cinematic prompts, create mock storyboard/keyframe assets, explain or organize the storyboard, and clear the preview or storyboard when you ask.",
-        "",
-        "Assets are stored references. Storyboard is the input/context rail. Preview is the output stage.",
-        "",
-        "Next controls to wire: finding assets by name, adding named assets to the storyboard from chat, reordering shots from chat, and sending storyboard context into real image/video APIs.",
+        "**Planned next:**",
+        "- Find assets by name from chat",
+        "- Add named assets to the storyboard without clicking",
+        "- Reorder shots from chat",
+        "- Send storyboard context into real image/video APIs",
       ].join("\n"), undefined, { typing: "deliberate" });
       return true;
     }
@@ -1336,7 +1342,11 @@ function Studio() {
                           ))}
                         </div>
                       )}
-                      {m.text && <div className="whitespace-pre-wrap">{m.text}</div>}
+                      {m.text && (
+                        m.role === "ai"
+                          ? <AssistantMessage text={m.text} />
+                          : <div className="whitespace-pre-wrap">{m.text}</div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1491,6 +1501,54 @@ function PanelHeader({ title, subtitle, children }: { title: string; subtitle?: 
         {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
       </div>
       <div className="flex items-center gap-2">{children}</div>
+    </div>
+  );
+}
+
+function AssistantMessage({ text }: { text: string }) {
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+
+  return (
+    <div className="space-y-2.5">
+      {lines.map((line, index) => {
+        const heading = line.match(/^\*\*(.+?)\*\*:?\s*$/);
+        const bullet = line.match(/^(?:[-*]|•)\s+(.*)$/);
+        if (heading) {
+          const title = heading[1];
+          const Icon = /planned|next|soon/i.test(title) ? Clock3 : /right now|can/i.test(title) ? CheckCircle2 : Sparkles;
+          return (
+            <div key={`${line}-${index}`} className="mt-3 first:mt-0 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <Icon className="h-3.5 w-3.5 text-primary" />
+              <span>{title}</span>
+            </div>
+          );
+        }
+        if (bullet) {
+          const cleaned = bullet[1].replace(/\*\*(.+?)\*\*/g, "$1").replace(/^\s+/, "");
+          const [lead, ...rest] = cleaned.split(":");
+          const hasLead = rest.length > 0 && lead.length < 44;
+          return (
+            <div key={`${line}-${index}`} className="flex gap-2 pl-0.5 text-foreground/90">
+              <Wand2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/85" />
+              <div>
+                {hasLead ? (
+                  <>
+                    <span className="font-medium text-foreground">{lead.trim()}</span>
+                    <span className="text-muted-foreground">:{rest.join(":")}</span>
+                  </>
+                ) : (
+                  <span>{cleaned}</span>
+                )}
+              </div>
+            </div>
+          );
+        }
+        return (
+          <p key={`${line}-${index}`} className="text-foreground/90">
+            {line.replace(/\*\*(.+?)\*\*/g, "$1")}
+          </p>
+        );
+      })}
     </div>
   );
 }
