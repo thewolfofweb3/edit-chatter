@@ -168,15 +168,36 @@ async function makeMockVideo(seedText: string, w = 1280, h = 720, durationSec = 
   return { url: URL.createObjectURL(blob), poster };
 }
 
+function parseRequestedCount(text: string, fallback: number) {
+  const t = text.toLowerCase();
+  const wordNumbers: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    eleven: 11,
+    twelve: 12,
+  };
+  const digit = t.match(/\b(\d+)\s*(?:storyboard\s*)?(?:shots?|frames?|keyframes?|clips?|images?|assets?|scenes?)\b/);
+  const word = t.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(?:storyboard\s*)?(?:shots?|frames?|keyframes?|clips?|images?|assets?|scenes?)\b/);
+  const count = digit ? parseInt(digit[1], 10) : word ? wordNumbers[word[1]] : fallback;
+  return Math.min(12, Math.max(1, count));
+}
+
 function detectMockIntent(text: string): { kind: "video" | "keyframe" | "storyboard"; count: number } | null {
   const t = text.toLowerCase();
   const mock = /mock|placeholder|fake|dummy/.test(t);
   const wantVideo = /\bvideo|clip|reel|animation\b/.test(t);
-  const wantKey = /\bkey\s*frame|keyframe|shot|frame\b/.test(t);
+  const wantKey = /\bkey\s*frame|keyframe|shot|frame|image|asset\b/.test(t);
   const wantBoard = /\bstoryboard|story\s*board|board\b/.test(t);
   if (!mock && !wantVideo && !wantKey && !wantBoard) return null;
-  const m = t.match(/(\d+)\s*(?:shots|frames|keyframes|clips)/);
-  const count = m ? Math.min(12, Math.max(1, parseInt(m[1], 10))) : (wantBoard ? 4 : 1);
+  const count = parseRequestedCount(t, wantBoard ? 4 : 1);
   if (wantVideo && !wantKey && !wantBoard) return { kind: "video", count: 1 };
   if (wantBoard) return { kind: "storyboard", count };
   return { kind: "keyframe", count };
@@ -282,6 +303,7 @@ function Studio() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const typingTimersRef = useRef<ReturnType<typeof setInterval>[]>([]);
 
   // Tool dock dragging
   const [dockPos, setDockPos] = useState({ x: 0, y: 0 });
@@ -362,12 +384,43 @@ function Studio() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    return () => {
+      typingTimersRef.current.forEach((timer) => clearInterval(timer));
+      typingTimersRef.current = [];
+    };
+  }, []);
+
   function updateChat(id: number, updater: (c: Chat) => Chat) {
     setChats((cs) => cs.map((c) => (c.id === id ? updater(c) : c)));
   }
 
   function pushMessage(role: "user" | "ai", text: string, attachments?: Attachment[]) {
     const id = Date.now() + Math.floor(Math.random() * 1000);
+    const chatId = currentChatId;
+    if (role === "ai" && text) {
+      updateChat(chatId, (c) => ({
+        ...c,
+        updatedAt: Date.now(),
+        messages: [...c.messages, { id, role, text: "", attachments }],
+      }));
+      let cursor = 0;
+      const step = Math.max(1, text.length > 220 ? 4 : text.length > 90 ? 3 : 2);
+      const timer = setInterval(() => {
+        cursor = Math.min(text.length, cursor + step);
+        updateChat(chatId, (c) => ({
+          ...c,
+          updatedAt: Date.now(),
+          messages: c.messages.map((m) => (m.id === id ? { ...m, text: text.slice(0, cursor) } : m)),
+        }));
+        if (cursor >= text.length) {
+          clearInterval(timer);
+          typingTimersRef.current = typingTimersRef.current.filter((t) => t !== timer);
+        }
+      }, 22);
+      typingTimersRef.current.push(timer);
+      return id;
+    }
     updateChat(currentChatId, (c) => ({
       ...c,
       updatedAt: Date.now(),
@@ -1221,19 +1274,19 @@ function Studio() {
             <>
               <div key={currentChatId} ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3 animate-fade-in">
                 {messages.map((m) => (
-                  <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} ${m.role === "ai" ? "px-1" : ""}`}>
                     <div
-                      className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                      className={`max-w-[85%] text-sm leading-relaxed ${
                         m.role === "user"
-                          ? "bg-primary text-primary-foreground rounded-br-sm"
-                          : "bg-accent text-foreground rounded-bl-sm"
+                          ? "rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-3.5 py-2 shadow-sm"
+                          : "text-foreground px-1 py-1"
                       }`}
                     >
                       {m.attachments && m.attachments.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-1.5">
                           {m.attachments.map((a) => (
                             a.url ? (
-                              <img key={a.id} src={a.url} alt={a.name} className="max-h-32 rounded-md border border-border/40" />
+                              <img key={a.id} src={a.url} alt={a.name} className="max-h-32 rounded-md border border-border/40 bg-background/30" />
                             ) : (
                               <div key={a.id} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-background/20 text-xs">
                                 <FileText className="h-3 w-3" /> {a.name}
@@ -1242,7 +1295,7 @@ function Studio() {
                           ))}
                         </div>
                       )}
-                      {m.text && <div>{m.text}</div>}
+                      {m.text && <div className="whitespace-pre-wrap">{m.text}</div>}
                     </div>
                   </div>
                 ))}
