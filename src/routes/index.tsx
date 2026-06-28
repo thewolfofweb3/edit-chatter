@@ -1451,12 +1451,15 @@ function PanelAssets({
 }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | AssetKind>("all");
-  const [activeAssetId, setActiveAssetId] = useState<number | null>(null);
+  const [viewerAssetId, setViewerAssetId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const filtered = assets.filter((a) =>
     (filter === "all" || a.kind === filter) && a.name.toLowerCase().includes(q.toLowerCase()),
   );
-  const activeAsset = assets.find((a) => a.id === activeAssetId) ?? filtered[0] ?? null;
+  const viewerAsset = assets.find((a) => a.id === viewerAssetId) ?? null;
+  const selectedAssets = selectedIds
+    .map((id) => assets.find((a) => a.id === id))
+    .filter((a): a is Asset => !!a);
   function toggleSelected(id: number) {
     setSelectedIds((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
   }
@@ -1487,13 +1490,20 @@ function PanelAssets({
         >
           <Upload className="h-3.5 w-3.5" /> Upload
         </button>
+        <button
+          onClick={() => selectedAssets[0] && onPreview(selectedAssets[0])}
+          disabled={selectedAssets.length === 0}
+          className="h-8 px-3 rounded-md bg-accent text-foreground text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Move to workspace
+        </button>
       </PanelHeader>
       {filtered.length === 0 ? (
         <div className="p-12 text-center text-sm text-muted-foreground">
           No assets yet. Upload files to get started.
         </div>
       ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-0 min-h-[calc(100vh-9rem)]">
+        <>
           <div className="p-6">
             {selectedIds.length > 0 && (
               <div className="mb-3 flex items-center justify-between rounded-lg border border-border bg-panel px-3 py-2 text-xs">
@@ -1504,11 +1514,10 @@ function PanelAssets({
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {filtered.map((a) => {
                 const selected = selectedIds.includes(a.id);
-                const active = activeAsset?.id === a.id;
                 return (
-                  <div key={a.id} className={`group rounded-lg border bg-panel overflow-hidden transition-colors ${active ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
+                  <div key={a.id} className={`group rounded-lg border bg-panel overflow-hidden transition-colors ${selected ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
                     <div className="relative aspect-video bg-black">
-                      <button onClick={() => setActiveAssetId(a.id)} className="absolute inset-0 h-full w-full">
+                      <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 h-full w-full">
                         <img src={a.kind === "video" ? (a.poster ?? "") : a.url} alt={a.name} className="absolute inset-0 w-full h-full object-cover" />
                         {a.kind === "video" && (
                           <div className="absolute inset-0 grid place-items-center bg-black/30">
@@ -1518,7 +1527,7 @@ function PanelAssets({
                       </button>
                       <button
                         onClick={() => toggleSelected(a.id)}
-                        className={`absolute left-2 top-2 h-5 w-5 rounded border grid place-items-center text-[10px] ${
+                        className={`absolute right-2 top-2 h-5 w-5 rounded border grid place-items-center text-[10px] ${
                           selected ? "border-primary bg-primary text-primary-foreground" : "border-white/50 bg-black/40 text-white/70"
                         }`}
                         title="Select asset"
@@ -1538,30 +1547,62 @@ function PanelAssets({
               })}
             </div>
           </div>
-          <aside className="border-l border-border bg-panel/60 p-4">
-            {activeAsset ? (
-              <div className="sticky top-4">
-                <div className="aspect-video overflow-hidden rounded-lg border border-border bg-black">
-                  <img src={activeAsset.kind === "video" ? (activeAsset.poster ?? "") : activeAsset.url} alt={activeAsset.name} className="h-full w-full object-contain" />
-                </div>
-                <div className="mt-3">
-                  <div className="text-sm font-medium truncate">{activeAsset.name}</div>
-                  <div className="mt-1 text-[11px] uppercase text-muted-foreground">{activeAsset.kind}</div>
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <button onClick={() => onPreview(activeAsset)} className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium">
-                    Open in workspace
+          {viewerAsset && (
+            <div
+              className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-8 backdrop-blur-sm"
+              onMouseDown={() => setViewerAssetId(null)}
+            >
+              <div
+                className="relative flex max-h-[86vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-panel shadow-2xl"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{viewerAsset.name}</div>
+                    <div className="mt-0.5 text-[11px] uppercase text-muted-foreground">{viewerAsset.kind}</div>
+                  </div>
+                  <button
+                    onClick={() => setViewerAssetId(null)}
+                    className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+                    title="Close"
+                  >
+                    <X className="h-4 w-4" />
                   </button>
-                  <button onClick={() => toggleSelected(activeAsset.id)} className="h-8 px-3 rounded-md bg-accent text-xs">
-                    {selectedIds.includes(activeAsset.id) ? "Unselect" : "Select"}
+                </div>
+                <div className="grid min-h-0 flex-1 place-items-center bg-black/70 p-5">
+                  {viewerAsset.kind === "video" ? (
+                    <video
+                      src={viewerAsset.url}
+                      poster={viewerAsset.poster}
+                      controls
+                      className="max-h-[68vh] max-w-full rounded-lg"
+                    />
+                  ) : (
+                    <img
+                      src={viewerAsset.url}
+                      alt={viewerAsset.name}
+                      className="max-h-[68vh] max-w-full rounded-lg object-contain"
+                    />
+                  )}
+                </div>
+                <div className="flex items-center justify-between border-t border-border px-4 py-3">
+                  <button
+                    onClick={() => toggleSelected(viewerAsset.id)}
+                    className="h-8 px-3 rounded-md bg-accent text-xs"
+                  >
+                    {selectedIds.includes(viewerAsset.id) ? "Unselect" : "Select asset"}
+                  </button>
+                  <button
+                    onClick={() => onPreview(viewerAsset)}
+                    className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium"
+                  >
+                    Open in workspace
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">Select an asset to inspect it.</div>
-            )}
-          </aside>
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
