@@ -389,6 +389,11 @@ function Studio() {
     const id = Date.now() + Math.floor(Math.random() * 1000);
     setShots((xs) => [...xs, { id, assetId: a.id, label: a.name }]);
     setSelectedShotId(id);
+    setPreviewAssetId(null);
+    setPreviewImage(null);
+    setStrokes([]);
+    setCurrentStroke(null);
+    setSelection(null);
     setShotPickerOpen(false);
   }
   function toggleShotPickerAsset(id: number) {
@@ -406,6 +411,11 @@ function Studio() {
     }));
     setShots((xs) => [...xs, ...nextShots]);
     setSelectedShotId(nextShots[0].id);
+    setPreviewAssetId(null);
+    setPreviewImage(null);
+    setStrokes([]);
+    setCurrentStroke(null);
+    setSelection(null);
     setShotPickerSelectedIds([]);
     setShotPickerOpen(false);
   }
@@ -432,11 +442,6 @@ function Studio() {
   function removeShot(id: number) {
     setShots((xs) => {
       const next = xs.filter((s) => s.id !== id);
-      if (previewAssetId && !next.some((s) => s.assetId === previewAssetId)) {
-        setPreviewAssetId(next[0]?.assetId ?? null);
-        const nextAsset = assets.find((a) => a.id === next[0]?.assetId);
-        setPreviewImage(nextAsset?.kind === "image" ? nextAsset.url : null);
-      }
       if (selectedShotId === id) setSelectedShotId(next[0]?.id ?? null);
       return next;
     });
@@ -517,6 +522,11 @@ function Studio() {
       }));
       setShots(nextShots);
       setSelectedShotId(nextShots[0]?.id ?? null);
+      setPreviewAssetId(null);
+      setPreviewImage(null);
+      setStrokes([]);
+      setCurrentStroke(null);
+      setSelection(null);
       pushMessage("ai", `Storyboard created with ${created.length} shot${created.length === 1 ? "" : "s"}.`);
     } else {
       if (created[0]) selectPreviewAsset(created[0]);
@@ -1504,7 +1514,7 @@ function PanelAssets({
           disabled={selectedAssets.length === 0}
           className="h-8 px-3 rounded-md bg-accent text-foreground text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Move to workspace
+          Add to storyboard
         </button>
       </PanelHeader>
       {filtered.length === 0 ? (
