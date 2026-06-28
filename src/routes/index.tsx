@@ -371,6 +371,12 @@ function Studio() {
   function addShot(assetId: number, label: string) {
     setShots((xs) => [...xs, { id: Date.now() + Math.floor(Math.random() * 1000), assetId, label }]);
   }
+  function addAssetToStoryboard(a: Asset) {
+    addShot(a.id, a.name);
+    setPreviewAssetId(a.id);
+    if (a.kind === "image") setPreviewImage(a.url);
+    setShotPickerOpen(false);
+  }
   function selectAsset(a: Asset) {
     setPreviewAssetId(a.id);
     if (a.kind === "image") setPreviewImage(a.url);
@@ -789,14 +795,11 @@ function Studio() {
 
               {/* Storyboard strip */}
               <div className="h-28 shrink-0 border-t border-border bg-panel/60 flex items-stretch">
-                <div className="flex flex-col justify-center px-4 shrink-0 border-r border-border min-w-[120px]">
+                <div className="relative shrink-0 flex w-28 flex-col items-center justify-center gap-1.5 px-3" ref={shotPickerRef}>
                   <div className="text-[11px] uppercase tracking-wider text-foreground/80 font-medium">Storyboard</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">{shots.length} shot{shots.length === 1 ? "" : "s"}</div>
-                </div>
-                <div className="relative shrink-0 flex items-center px-3 border-r border-border" ref={shotPickerRef}>
                   <button
                     onClick={() => setShotPickerOpen((v) => !v)}
-                    className={`h-20 w-20 rounded-md border border-dashed grid place-items-center transition-colors ${
+                    className={`h-14 w-16 rounded-md border border-dashed grid place-items-center transition-colors ${
                       shotPickerOpen ? "border-primary text-foreground bg-accent/40" : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
                     }`}
                     title="Add shot from assets"
@@ -822,6 +825,7 @@ function Studio() {
                             {assets.map((a) => (
                               <button
                                 key={a.id}
+                                onClick={() => addAssetToStoryboard(a)}
                                 className="relative aspect-video rounded-md overflow-hidden border border-border hover:border-primary/60 bg-black"
                                 title={a.name}
                               >
@@ -840,19 +844,12 @@ function Studio() {
                           </div>
                         )}
                       </div>
-                      <div className="px-3 py-2 border-t border-border flex items-center justify-end gap-2">
+                      <div className="px-3 py-2 border-t border-border flex items-center justify-end">
                         <button
                           onClick={() => setShotPickerOpen(false)}
                           className="h-7 px-2.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent"
                         >
                           Cancel
-                        </button>
-                        <button
-                          disabled
-                          className="h-7 px-3 rounded-md bg-primary/60 text-primary-foreground text-xs font-medium opacity-60 cursor-not-allowed"
-                          title="Selection wiring coming soon"
-                        >
-                          Add selected
                         </button>
                       </div>
                     </div>
