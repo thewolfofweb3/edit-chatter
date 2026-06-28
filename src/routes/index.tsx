@@ -37,6 +37,10 @@ type Asset = {
   kind: AssetKind;
   url: string;        // data URL or object URL
   poster?: string;    // poster for videos
+  width?: number;
+  height?: number;
+  ratio?: string;
+  sizeLabel?: string;
   createdAt: number;
 };
 type Shot = { id: number; assetId: number; label: string };
@@ -61,6 +65,16 @@ const SIZE_PRESETS: Preset[] = [
   { label: "Cinema 21:9 · 2560×1080", w: 2560, h: 1080, ratio: "21 / 9" },
   { label: "4K · 3840×2160", w: 3840, h: 2160, ratio: "16 / 9" },
 ];
+
+function presetFromAsset(asset: Asset | null | undefined, fallback: Preset): Preset {
+  if (!asset?.width || !asset?.height) return fallback;
+  return {
+    label: asset.sizeLabel ?? `${asset.width}×${asset.height}`,
+    w: asset.width,
+    h: asset.height,
+    ratio: asset.ratio ?? `${asset.width} / ${asset.height}`,
+  };
+}
 
 const TEMPLATES: Template[] = [
   { id: "t1", name: "Product Hero", description: "Centered product on gradient with floating bokeh.", ratio: "16 / 9", accent: "from-indigo-500 to-fuchsia-500" },
@@ -307,6 +321,8 @@ function Studio() {
   const previewAsset = assets.find((a) => a.id === previewAssetId) ?? null;
   const showVideo = previewAsset?.kind === "video";
   const visibleImage = !showVideo ? (previewAsset?.url ?? previewImage) : null;
+  const outputPreset = presetFromAsset(previewAsset, selectedPreset);
+  const hasPreviewOutput = !!previewAsset || !!previewImage;
 
   const draggingRef = useRef(false);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -430,7 +446,7 @@ function Studio() {
 
   const previewWidth = Math.max(0, shellWidth - 48 - 4 - chatWidth);
   const previewCollapsed = shellWidth > 0 && previewWidth < 240;
-  const previewRatio = selectedPreset.w / selectedPreset.h;
+  const previewRatio = outputPreset.w / outputPreset.h;
   const previewMaxWidth = Math.max(260, Math.min(1152, previewAreaSize.w - 48));
   const previewMaxHeight = Math.max(220, previewAreaSize.h - 98);
   const previewFrame =
@@ -493,6 +509,29 @@ function Studio() {
     const asset: Asset = { ...a, id: Date.now() + Math.floor(Math.random() * 1000), createdAt: Date.now() };
     setAssets((xs) => [asset, ...xs]);
     return asset;
+  }
+  function updateAssetDimensions(asset: Asset) {
+    if (asset.width && asset.height) return;
+    if (asset.kind === "image") {
+      void loadImage(asset.url).then((img) => {
+        setAssets((xs) => xs.map((a) => (
+          a.id === asset.id
+            ? { ...a, width: img.naturalWidth, height: img.naturalHeight, ratio: `${img.naturalWidth} / ${img.naturalHeight}`, sizeLabel: `${img.naturalWidth}×${img.naturalHeight}` }
+            : a
+        )));
+      }).catch(() => {});
+      return;
+    }
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      setAssets((xs) => xs.map((a) => (
+        a.id === asset.id && video.videoWidth && video.videoHeight
+          ? { ...a, width: video.videoWidth, height: video.videoHeight, ratio: `${video.videoWidth} / ${video.videoHeight}`, sizeLabel: `${video.videoWidth}×${video.videoHeight}` }
+          : a
+      )));
+    };
+    video.src = asset.url;
   }
   function addShot(assetId: number, label: string) {
     setShots((xs) => [...xs, { id: Date.now() + Math.floor(Math.random() * 1000), assetId, label }]);
@@ -620,6 +659,10 @@ function Studio() {
       kind,
       url,
       poster: previewAsset?.poster,
+      width: outputPreset.w,
+      height: outputPreset.h,
+      ratio: outputPreset.ratio,
+      sizeLabel: outputPreset.label,
     });
     setPreviewAssetId(a.id);
   }
@@ -631,7 +674,7 @@ function Studio() {
       const isImage = f.type.startsWith("image/");
       if (!isVideo && !isImage) continue;
       const url = URL.createObjectURL(f);
-      addAsset({ name: f.name, kind: isVideo ? "video" : "image", url });
+      updateAssetDimensions(addAsset({ name: f.name, kind: isVideo ? "video" : "image", url }));
     }
     e.target.value = "";
   }
@@ -649,7 +692,7 @@ function Studio() {
       setThinkingLabel("Rendering a motion preview");
       await wait(700);
       const video = await makeMockVideo(text);
-      const asset = addAsset({ name: "mock-video.webm", kind: "video", url: video.url, poster: video.poster });
+      const asset = addAsset({ name: "mock-video.webm", kind: "video", url: video.url, poster: video.poster, width: 1280, height: 720, ratio: "16 / 9", sizeLabel: "Landscape · 1280×720" });
       selectPreviewAsset(asset);
       pushMessage("ai", "Mock video created and saved to Assets.");
       return true;
@@ -664,6 +707,10 @@ function Studio() {
         name: intent.kind === "storyboard" ? `storyboard-shot-${i + 1}.png` : `mock-keyframe-${i + 1}.png`,
         kind: "image",
         url,
+        width: preset.w,
+        height: preset.h,
+        ratio: preset.ratio,
+        sizeLabel: preset.label,
       }));
     }
 
@@ -803,7 +850,15 @@ function Studio() {
         catch (e) { console.error("composite failed, using raw edit", e); }
       }
 
-      const a = addAsset({ name: isEdit ? "edited.png" : "generated.png", kind: "image", url: finalDataUrl });
+      const a = addAsset({
+        name: isEdit ? "edited.png" : "generated.png",
+        kind: "image",
+        url: finalDataUrl,
+        width: activePreset.w,
+        height: activePreset.h,
+        ratio: activePreset.ratio,
+        sizeLabel: activePreset.label,
+      });
       setPreviewImage(finalDataUrl);
       setPreviewAssetId(a.id);
       setStrokes([]);
@@ -870,7 +925,7 @@ function Studio() {
     const next: Attachment[] = Array.from(files).map((f, i) => {
       const url = f.type.startsWith("image/") || f.type.startsWith("video/") ? URL.createObjectURL(f) : undefined;
       if (url && (f.type.startsWith("image/") || f.type.startsWith("video/"))) {
-        addAsset({ name: f.name, kind: f.type.startsWith("video/") ? "video" : "image", url });
+        updateAssetDimensions(addAsset({ name: f.name, kind: f.type.startsWith("video/") ? "video" : "image", url }));
       }
       return {
         id: Date.now() + i,
@@ -1115,14 +1170,18 @@ function Studio() {
                   </button>
                   <div className="h-5 w-px bg-border" />
                   <button
-                    onClick={() => setMenu(menu === "size" ? null : "size")}
-                    className="h-8 min-w-[176px] justify-between rounded-md px-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
-                    title="Preview dimensions"
+                    onClick={() => {
+                      if (hasPreviewOutput) return;
+                      setMenu(menu === "size" ? null : "size");
+                    }}
+                    className="h-8 min-w-[176px] justify-between rounded-md px-2 text-xs text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-70 flex items-center gap-2"
+                    title={hasPreviewOutput ? "Output size is locked to this generation. Ask for a new size to generate a new output." : "Preview dimensions"}
+                    disabled={hasPreviewOutput}
                   >
-                    <span className="truncate">{selectedPreset.label}</span>
-                    <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${menu === "size" ? "rotate-180" : ""}`} />
+                    <span className="truncate">{outputPreset.label}</span>
+                    {!hasPreviewOutput && <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${menu === "size" ? "rotate-180" : ""}`} />}
                   </button>
-                  {menu === "size" && (
+                  {menu === "size" && !hasPreviewOutput && (
                     <div className="absolute bottom-full left-10 mb-2 w-64 overflow-hidden rounded-lg border border-border bg-popover shadow-xl z-40">
                       {SIZE_PRESETS.map((preset, idx) => (
                         <button
@@ -1176,7 +1235,8 @@ function Studio() {
                               <button
                                 key={a.id}
                                 onClick={() => toggleShotPickerAsset(a.id)}
-                                className={`relative aspect-video rounded-md overflow-hidden border bg-black ${
+                                style={{ aspectRatio: a.ratio ?? "16 / 9" }}
+                                className={`relative rounded-md overflow-hidden border bg-black ${
                                   shotPickerSelectedIds.includes(a.id) ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/60"
                                 }`}
                                 title={a.name}
@@ -1242,7 +1302,8 @@ function Studio() {
                             if (dragShotId) moveShot(dragShotId, s.id);
                             setDragShotId(null);
                           }}
-                          className={`group relative h-20 w-32 rounded-md overflow-hidden border shrink-0 ${
+                          style={{ width: Math.max(46, Math.min(188, 80 * ((a.width ?? 16) / (a.height ?? 9)))), aspectRatio: a.ratio ?? "16 / 9" }}
+                          className={`group relative h-20 rounded-md overflow-hidden border shrink-0 bg-black ${
                             active ? "border-primary ring-2 ring-primary/40" : "border-border"
                           }`}
                           title={s.label}
@@ -1312,7 +1373,15 @@ function Studio() {
                 if (idx >= 0) setSizeIdx(idx);
                 const tplPreset = SIZE_PRESETS[idx >= 0 ? idx : sizeIdx];
                 const url = makeMockImage(tpl.name, tplPreset.w, tplPreset.h);
-                const a = addAsset({ name: `${tpl.name}.png`, kind: "image", url });
+                const a = addAsset({
+                  name: `${tpl.name}.png`,
+                  kind: "image",
+                  url,
+                  width: tplPreset.w,
+                  height: tplPreset.h,
+                  ratio: tplPreset.ratio,
+                  sizeLabel: tplPreset.label,
+                });
                 setPreviewAssetId(a.id); setPreviewImage(url);
                 setActiveTab("workspace");
               }}
@@ -1796,7 +1865,7 @@ function PanelAssets({
                 const selected = selectedIds.includes(a.id);
                 return (
                   <div key={a.id} className={`group rounded-lg border bg-panel overflow-hidden transition-colors ${selected ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
-                    <div className="relative aspect-video bg-black">
+                    <div className="relative bg-black" style={{ aspectRatio: a.ratio ?? "16 / 9" }}>
                       <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 h-full w-full">
                         <img src={a.kind === "video" ? (a.poster ?? "") : a.url} alt={a.name} className="absolute inset-0 w-full h-full object-cover" />
                         {a.kind === "video" && (
@@ -1829,17 +1898,17 @@ function PanelAssets({
           </div>
           {viewerAsset && (
             <div
-              className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-8 backdrop-blur-sm"
+              className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-5 backdrop-blur-sm"
               onMouseDown={() => setViewerAssetId(null)}
             >
               <div
-                className="relative flex max-h-[86vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-panel shadow-2xl"
+                className="relative flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-panel shadow-2xl"
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{viewerAsset.name}</div>
-                    <div className="mt-0.5 text-[11px] uppercase text-muted-foreground">{viewerAsset.kind}</div>
+                    <div className="text-[11px] uppercase text-muted-foreground">{viewerAsset.sizeLabel ?? viewerAsset.kind}</div>
                   </div>
                   <button
                     onClick={() => setViewerAssetId(null)}
@@ -1849,23 +1918,23 @@ function PanelAssets({
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid min-h-0 flex-1 place-items-center bg-black/70 p-5">
+                <div className="grid min-h-0 flex-1 place-items-center bg-black/70 p-3">
                   {viewerAsset.kind === "video" ? (
                     <video
                       src={viewerAsset.url}
                       poster={viewerAsset.poster}
                       controls
-                      className="max-h-[68vh] max-w-full rounded-lg"
+                      className="max-h-full max-w-full rounded-lg object-contain"
                     />
                   ) : (
                     <img
                       src={viewerAsset.url}
                       alt={viewerAsset.name}
-                      className="max-h-[68vh] max-w-full rounded-lg object-contain"
+                      className="max-h-full max-w-full rounded-lg object-contain"
                     />
                   )}
                 </div>
-                <div className="flex items-center justify-between gap-4 border-t border-border bg-panel px-4 py-3">
+                <div className="flex h-12 shrink-0 items-center justify-between gap-4 border-t border-border bg-panel px-3">
                   <div className="min-w-0">
                     <div className="truncate text-xs font-medium text-foreground">{viewerAsset.name}</div>
                     <div className="mt-0.5 text-[11px] text-muted-foreground">
