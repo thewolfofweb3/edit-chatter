@@ -215,7 +215,7 @@ function parseRequestedCount(text: string, fallback: number) {
   return Math.min(12, Math.max(1, count));
 }
 
-function detectMockIntent(text: string): { kind: "video" | "keyframe" | "storyboard"; count: number } | null {
+function detectMockIntent(text: string, requestedPresetCount = 0): { kind: "video" | "keyframe" | "storyboard"; count: number } | null {
   const t = text.toLowerCase();
   const mock = /mock|placeholder|fake|dummy/.test(t);
   const wantsCreate = /\b(create|generate|make|build|render|produce|give me|add)\b/.test(t);
@@ -225,7 +225,8 @@ function detectMockIntent(text: string): { kind: "video" | "keyframe" | "storybo
   const wantsMultipleMedia = /\b(multiple|several|few|couple|\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/.test(t) && wantKey;
   if (!mock && !wantVideo && !wantKey && !wantBoard) return null;
   if (!mock && !wantsCreate && !wantBoard && !wantsMultipleMedia) return null;
-  const count = parseRequestedCount(t, wantBoard ? 4 : wantsMultipleMedia ? 4 : 1);
+  const fallbackCount = wantBoard ? 4 : requestedPresetCount > 1 ? requestedPresetCount : wantsMultipleMedia ? 4 : 1;
+  const count = parseRequestedCount(t, fallbackCount);
   if (wantVideo && !wantKey && !wantBoard) return { kind: "video", count: 1 };
   if (wantBoard) return { kind: "storyboard", count };
   return { kind: "keyframe", count };
@@ -253,6 +254,11 @@ function detectRequestedPresets(text: string): number[] {
     .sort((a, b) => a.index - b.index)
     .map((m) => m.preset)
     .filter((preset, index, presets) => presets.indexOf(preset) === index);
+}
+
+function buildRequestedPresetSequence(count: number, requestedPresetIdxs: number[], fallbackPreset: Preset) {
+  if (requestedPresetIdxs.length === 0) return Array.from({ length: count }, () => fallbackPreset);
+  return Array.from({ length: count }, (_, i) => SIZE_PRESETS[requestedPresetIdxs[i % requestedPresetIdxs.length]]);
 }
 
 function Studio() {
@@ -773,7 +779,7 @@ function Studio() {
   }
 
   async function runMockWorkspaceAction(text: string, preset: Preset = selectedPreset, requestedPresetIdxs: number[] = []) {
-    const intent = detectMockIntent(text);
+    const intent = detectMockIntent(text, requestedPresetIdxs.length);
     if (!intent) return false;
 
     setThinkingLabel("Reading the request");
@@ -792,12 +798,11 @@ function Studio() {
     }
 
     const created: Asset[] = [];
+    const presetSequence = buildRequestedPresetSequence(intent.count, requestedPresetIdxs, preset);
     for (let i = 0; i < intent.count; i++) {
       setThinkingLabel(`Creating asset ${i + 1} of ${intent.count}`);
       await wait(350);
-      const assetPreset = requestedPresetIdxs.length > 1
-        ? SIZE_PRESETS[requestedPresetIdxs[i % requestedPresetIdxs.length]]
-        : preset;
+      const assetPreset = presetSequence[i];
       const url = makeMockImage(`${text}${intent.count > 1 ? ` - ${i + 1}` : ""}`, assetPreset.w, assetPreset.h);
       created.push(addAsset({
         name: intent.kind === "storyboard" ? `storyboard-shot-${i + 1}.png` : `mock-keyframe-${i + 1}.png`,
@@ -823,7 +828,8 @@ function Studio() {
       pushMessage("ai", `Storyboard created with ${created.length} shot${created.length === 1 ? "" : "s"}.`);
     } else {
       if (created[0]) selectPreviewAsset(created[0]);
-      pushMessage("ai", `${created.length} mock keyframe${created.length === 1 ? "" : "s"} saved to Assets.`);
+      const sizeSummary = created.map((asset) => asset.sizeLabel ?? "asset").join(", ");
+      pushMessage("ai", `${created.length} mock keyframe${created.length === 1 ? "" : "s"} saved to Assets: ${sizeSummary}.`);
     }
     return true;
   }
@@ -1960,9 +1966,9 @@ function PanelAssets({
                 const selected = selectedIds.includes(a.id);
                 const isWideAsset = (a.width ?? 16) >= (a.height ?? 9);
                 return (
-                  <div key={a.id} className={`group grid h-72 grid-rows-[minmax(0,1fr)_52px] rounded-lg border bg-panel overflow-hidden transition-colors ${selected ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
+                  <div key={a.id} className={`group grid h-80 grid-rows-[minmax(0,1fr)_52px] rounded-lg border bg-panel overflow-hidden transition-colors ${selected ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
                     <div className="relative min-h-0 bg-black">
-                      <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 grid h-full w-full place-items-center p-5">
+                      <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 grid h-full w-full place-items-center p-6">
                         <div
                           className="relative max-h-full max-w-full overflow-hidden rounded-lg bg-black shadow-sm ring-1 ring-white/5"
                           style={{ aspectRatio: a.ratio ?? "16 / 9", ...(isWideAsset ? { width: "100%" } : { height: "100%" }) }}
