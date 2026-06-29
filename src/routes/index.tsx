@@ -876,7 +876,8 @@ function Studio() {
 
   async function send() {
     const t = input.trim();
-    if ((!t && pendingAttachments.length === 0) || isThinking) return;
+    const hasCanvasMark = (strokes.length > 0 || !!selection) && !!visibleImage && !showVideo;
+    if ((!t && pendingAttachments.length === 0 && !hasCanvasMark) || isThinking) return;
 
     const requestedPresetIdxs = detectRequestedPresets(t);
     const requestedPresetIdx = requestedPresetIdxs.length ? requestedPresetIdxs[requestedPresetIdxs.length - 1] : null;
@@ -884,7 +885,7 @@ function Studio() {
     if (requestedPresetIdx !== null && requestedPresetIdx !== sizeIdx) setSizeIdx(requestedPresetIdx);
 
     const activeSelections = selection ? [selection] : [];
-    const hasMarkedRegion = (strokes.length > 0 || activeSelections.length > 0) && !!visibleImage && !showVideo;
+    const hasMarkedRegion = hasCanvasMark;
     const userAtts: Attachment[] = [...pendingAttachments];
     let maskDataUrl: string | null = null;
 
@@ -895,22 +896,6 @@ function Studio() {
         maskDataUrl = buildMaskDataUrl(
           strokes, rect.width, rect.height, img.naturalWidth, img.naturalHeight, settings.brushSize, activeSelections,
         );
-        const chip = document.createElement("canvas");
-        chip.width = img.naturalWidth; chip.height = img.naturalHeight;
-        const cctx = chip.getContext("2d")!;
-        cctx.drawImage(img, 0, 0);
-        const maskImg = await loadImage(maskDataUrl);
-        cctx.globalAlpha = 0.55;
-        const tint = document.createElement("canvas");
-        tint.width = chip.width; tint.height = chip.height;
-        const tctx = tint.getContext("2d")!;
-        tctx.drawImage(maskImg, 0, 0);
-        tctx.globalCompositeOperation = "source-in";
-        tctx.fillStyle = settings.brushColor;
-        tctx.fillRect(0, 0, tint.width, tint.height);
-        cctx.drawImage(tint, 0, 0);
-        cctx.globalAlpha = 1;
-        userAtts.push({ id: Date.now(), name: "marked-region.png", type: "image/png", url: chip.toDataURL("image/png") });
       } catch (e) {
         console.error("mask snapshot failed", e);
       }
@@ -1118,6 +1103,12 @@ function Studio() {
   }
 
   const cursorClass = tool === "select" || tool === "brush" ? "cursor-crosshair" : "cursor-default";
+  const hasDraftMarkedRegion = !!visibleImage && !showVideo && (strokes.length > 0 || !!selection);
+  const markedRegionLabel = strokes.length > 0 && selection
+    ? "Editing marked region - highlight and brush mask active."
+    : selection
+      ? "Editing highlighted region - your next message edits inside the box."
+      : "Editing brushed region - your next message edits only the painted area.";
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden">
@@ -1755,10 +1746,10 @@ function Studio() {
               {/* Composer */}
               <div className="p-3">
                 <input ref={fileInputRef} type="file" multiple className="hidden" onChange={onPickFiles} />
-                {visibleImage && !showVideo && strokes.length > 0 && (
+                {hasDraftMarkedRegion && (
                   <div className="mb-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/10 border border-primary/30 text-xs text-foreground">
                     <Target className="h-3 w-3 text-primary" />
-                    <span>Editing highlighted region — your next message edits only the brushed area.</span>
+                    <span>{markedRegionLabel}</span>
                   </div>
                 )}
                 <div className="rounded-xl bg-input/60 border border-border focus-within:border-primary/60 transition-colors">
@@ -1851,7 +1842,7 @@ function Studio() {
                       <button
                         onClick={send}
                         className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 disabled:opacity-40"
-                        disabled={isThinking || (!input.trim() && pendingAttachments.length === 0)}
+                        disabled={isThinking || (!input.trim() && pendingAttachments.length === 0 && !hasDraftMarkedRegion)}
                       >
                         Send <Send className="h-3 w-3" />
                       </button>
