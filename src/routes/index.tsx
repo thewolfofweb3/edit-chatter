@@ -338,7 +338,7 @@ function Studio() {
 
   const [input, setInput] = useState("");
   const [chatWidth, setChatWidth] = useState(380);
-  const [activeRail, setActiveRail] = useState<WorkspaceRail>("storyboard");
+  const [railOrder, setRailOrder] = useState<WorkspaceRail[]>(["storyboard", "timeline", "audio"]);
   const [storyboardHeight, setStoryboardHeight] = useState(STORYBOARD_OPEN);
   const [timelineHeight, setTimelineHeight] = useState(RAIL_CLOSED);
   const [audioHeight, setAudioHeight] = useState(RAIL_CLOSED);
@@ -371,10 +371,6 @@ function Studio() {
   const storyboardCollapsed = storyboardHeight < 44;
   const timelineCollapsed = timelineHeight < 36;
   const audioCollapsed = audioHeight < 34;
-  const railOrder: WorkspaceRail[] = [
-    activeRail,
-    ...(["storyboard", "timeline", "audio"] as WorkspaceRail[]).filter((rail) => rail !== activeRail),
-  ];
   const railHeightMap: Record<WorkspaceRail, number> = {
     storyboard: storyboardHeight,
     timeline: timelineHeight,
@@ -479,7 +475,6 @@ function Studio() {
   }
 
   function openWorkspaceRail(rail: WorkspaceRail) {
-    setActiveRail(rail);
     if (rail === "storyboard") setStoryboardHeight(STORYBOARD_OPEN);
     if (rail === "timeline") setTimelineHeight(TIMELINE_OPEN);
     if (rail === "audio") setAudioHeight(AUDIO_OPEN);
@@ -490,7 +485,7 @@ function Studio() {
       rail === "storyboard" ? !storyboardCollapsed :
       rail === "timeline" ? !timelineCollapsed :
       !audioCollapsed;
-    if (activeRail === rail && isOpen) {
+    if (isOpen) {
       if (rail === "storyboard") setStoryboardHeight(RAIL_CLOSED);
       if (rail === "timeline") setTimelineHeight(RAIL_CLOSED);
       if (rail === "audio") setAudioHeight(RAIL_CLOSED);
@@ -507,6 +502,30 @@ function Studio() {
         .slice(index + 1)
         .reduce((sum, current) => sum + railHeightMap[current], 0);
     };
+    const moveRailToPointer = (rail: WorkspaceRail, clientY: number, rect: DOMRect) => {
+      const totalRailHeight = railOrder.reduce((sum, current) => sum + railHeightMap[current], 0);
+      const stackTop = rect.bottom - totalRailHeight;
+      let cursor = stackTop;
+      let targetIndex = railOrder.length - 1;
+
+      for (let i = 0; i < railOrder.length; i++) {
+        const current = railOrder[i];
+        const center = cursor + railHeightMap[current] / 2;
+        if (clientY < center) {
+          targetIndex = i;
+          break;
+        }
+        cursor += railHeightMap[current];
+      }
+
+      setRailOrder((currentOrder) => {
+        const withoutRail = currentOrder.filter((current) => current !== rail);
+        const insertAt = Math.max(0, Math.min(withoutRail.length, targetIndex));
+        const nextOrder = [...withoutRail];
+        nextOrder.splice(insertAt, 0, rail);
+        return nextOrder.every((current, index) => current === currentOrder[index]) ? currentOrder : nextOrder;
+      });
+    };
 
     function onMove(e: MouseEvent) {
       if (!shellRef.current) return;
@@ -514,17 +533,26 @@ function Studio() {
       const SNAP_CLOSE = 28;
       if (storyboardDragRef.current) {
         const press = storyboardPressRef.current;
-        if (press && Math.abs(e.clientY - press.startY) > 3) storyboardSuppressClickRef.current = true;
+        if (press && Math.abs(e.clientY - press.startY) > 3) {
+          storyboardSuppressClickRef.current = true;
+          moveRailToPointer("storyboard", e.clientY, rect);
+        }
         const raw = rect.bottom - e.clientY - heightBelowRail("storyboard");
         setStoryboardHeight(raw < SNAP_CLOSE ? RAIL_CLOSED : Math.max(RAIL_CLOSED, Math.min(STORYBOARD_OPEN, raw)));
       } else if (timelineDragRef.current) {
         const press = timelinePressRef.current;
-        if (press && Math.abs(e.clientY - press.startY) > 3) timelineSuppressClickRef.current = true;
+        if (press && Math.abs(e.clientY - press.startY) > 3) {
+          timelineSuppressClickRef.current = true;
+          moveRailToPointer("timeline", e.clientY, rect);
+        }
         const raw = rect.bottom - e.clientY - heightBelowRail("timeline");
         setTimelineHeight(raw < SNAP_CLOSE ? RAIL_CLOSED : Math.max(RAIL_CLOSED, Math.min(TIMELINE_OPEN, raw)));
       } else if (audioDragRef.current) {
         const press = audioPressRef.current;
-        if (press && Math.abs(e.clientY - press.startY) > 3) audioSuppressClickRef.current = true;
+        if (press && Math.abs(e.clientY - press.startY) > 3) {
+          audioSuppressClickRef.current = true;
+          moveRailToPointer("audio", e.clientY, rect);
+        }
         const raw = rect.bottom - e.clientY - heightBelowRail("audio");
         setAudioHeight(raw < SNAP_CLOSE ? RAIL_CLOSED : Math.max(RAIL_CLOSED, Math.min(AUDIO_OPEN, raw)));
       }
@@ -1269,7 +1297,6 @@ function Studio() {
             <>
               <button
                 onMouseDown={(e) => {
-                  setActiveRail("storyboard");
                   storyboardDragRef.current = true;
                   storyboardPressRef.current = { startY: e.clientY };
                   document.body.style.cursor = "row-resize";
@@ -1311,7 +1338,6 @@ function Studio() {
               </svg>
               <button
                 onMouseDown={(e) => {
-                  setActiveRail("timeline");
                   timelineDragRef.current = true;
                   timelinePressRef.current = { startY: e.clientY };
                   document.body.style.cursor = "row-resize";
@@ -1338,7 +1364,6 @@ function Studio() {
               </svg>
               <button
                 onMouseDown={(e) => {
-                  setActiveRail("audio");
                   audioDragRef.current = true;
                   audioPressRef.current = { startY: e.clientY };
                   document.body.style.cursor = "row-resize";
@@ -1546,7 +1571,6 @@ function Studio() {
               >
                 <button
                   onMouseDown={(e) => {
-                    setActiveRail("storyboard");
                     storyboardDragRef.current = true;
                     storyboardPressRef.current = { startY: e.clientY };
                     document.body.style.cursor = "row-resize";
@@ -1711,7 +1735,6 @@ function Studio() {
               >
                 <button
                   onMouseDown={(e) => {
-                    setActiveRail("timeline");
                     timelineDragRef.current = true;
                     timelinePressRef.current = { startY: e.clientY };
                     document.body.style.cursor = "row-resize";
@@ -1775,7 +1798,6 @@ function Studio() {
               >
                 <button
                   onMouseDown={(e) => {
-                    setActiveRail("audio");
                     audioDragRef.current = true;
                     audioPressRef.current = { startY: e.clientY };
                     document.body.style.cursor = "row-resize";
