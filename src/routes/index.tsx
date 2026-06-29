@@ -7,7 +7,7 @@ import {
   SquareDashedMousePointer, MousePointer2, Plus, Brush,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
   LayoutGrid, Library, Save, LayoutTemplate,
-  Target, Play, Sparkles, Search, CheckCircle2, Clock3, Wand2,
+  Target, Play, Sparkles, Search, CheckCircle2, Clock3, Wand2, Volume2,
 } from "lucide-react";
 import { buildMaskDataUrl, compositeWithMask, dataUrlToBase64, loadImage } from "@/lib/imageOps";
 
@@ -333,6 +333,9 @@ function Studio() {
   const [input, setInput] = useState("");
   const [chatWidth, setChatWidth] = useState(380);
   const [storyboardHeight, setStoryboardHeight] = useState(112);
+  const [timelineHeight, setTimelineHeight] = useState(76);
+  const [audioHeight, setAudioHeight] = useState(58);
+  const [audioMuted, setAudioMuted] = useState(false);
   const [shellWidth, setShellWidth] = useState(0);
   const [tool, setTool] = useState<Tool>("select");
   const [sizeIdx, setSizeIdx] = useState(0);
@@ -365,6 +368,12 @@ function Studio() {
   const storyboardDragRef = useRef(false);
   const storyboardPressRef = useRef<{ startY: number } | null>(null);
   const storyboardSuppressClickRef = useRef(false);
+  const timelineDragRef = useRef(false);
+  const timelinePressRef = useRef<{ startY: number } | null>(null);
+  const timelineSuppressClickRef = useRef(false);
+  const audioDragRef = useRef(false);
+  const audioPressRef = useRef<{ startY: number } | null>(null);
+  const audioSuppressClickRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -435,22 +444,41 @@ function Studio() {
 
   useEffect(() => {
     function onMove(e: MouseEvent) {
-      if (!storyboardDragRef.current || !shellRef.current) return;
-      const press = storyboardPressRef.current;
-      if (press && Math.abs(e.clientY - press.startY) > 3) storyboardSuppressClickRef.current = true;
+      if (!shellRef.current) return;
       const rect = shellRef.current.getBoundingClientRect();
-      const MIN_STORYBOARD = 10;
-      const MAX_STORYBOARD = 112;
       const SNAP_CLOSE = 28;
-      const raw = rect.bottom - e.clientY;
-      const next = raw < SNAP_CLOSE ? MIN_STORYBOARD : Math.max(MIN_STORYBOARD, Math.min(MAX_STORYBOARD, raw));
-      setStoryboardHeight(next);
+      if (storyboardDragRef.current) {
+        const press = storyboardPressRef.current;
+        if (press && Math.abs(e.clientY - press.startY) > 3) storyboardSuppressClickRef.current = true;
+        const raw = rect.bottom - e.clientY - timelineHeight - audioHeight;
+        setStoryboardHeight(raw < SNAP_CLOSE ? 10 : Math.max(10, Math.min(112, raw)));
+      } else if (timelineDragRef.current) {
+        const press = timelinePressRef.current;
+        if (press && Math.abs(e.clientY - press.startY) > 3) timelineSuppressClickRef.current = true;
+        const raw = rect.bottom - e.clientY - audioHeight;
+        setTimelineHeight(raw < SNAP_CLOSE ? 10 : Math.max(10, Math.min(86, raw)));
+      } else if (audioDragRef.current) {
+        const press = audioPressRef.current;
+        if (press && Math.abs(e.clientY - press.startY) > 3) audioSuppressClickRef.current = true;
+        const raw = rect.bottom - e.clientY;
+        setAudioHeight(raw < SNAP_CLOSE ? 10 : Math.max(10, Math.min(68, raw)));
+      }
     }
     function onUp() {
       if (storyboardDragRef.current) {
         storyboardDragRef.current = false;
         storyboardPressRef.current = null;
         setTimeout(() => { storyboardSuppressClickRef.current = false; }, 0);
+      }
+      if (timelineDragRef.current) {
+        timelineDragRef.current = false;
+        timelinePressRef.current = null;
+        setTimeout(() => { timelineSuppressClickRef.current = false; }, 0);
+      }
+      if (audioDragRef.current) {
+        audioDragRef.current = false;
+        audioPressRef.current = null;
+        setTimeout(() => { audioSuppressClickRef.current = false; }, 0);
       }
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
@@ -461,7 +489,7 @@ function Studio() {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, []);
+  }, [timelineHeight, audioHeight]);
 
   useEffect(() => {
     function onMove(e: MouseEvent) {
@@ -515,8 +543,17 @@ function Studio() {
   const previewWidth = Math.max(0, shellWidth - 48 - 4 - chatWidth);
   const previewCollapsed = shellWidth > 0 && previewWidth < 240;
   const storyboardCollapsed = storyboardHeight < 44;
-  const storyboardRailTabBottom = Math.max(0, storyboardHeight - 10);
-  const storyboardRailConnectorBottom = Math.max(0, storyboardHeight - 3);
+  const timelineCollapsed = timelineHeight < 36;
+  const audioCollapsed = audioHeight < 34;
+  const audioRailAnchor = audioHeight;
+  const timelineRailAnchor = audioHeight + timelineHeight;
+  const storyboardRailAnchor = audioHeight + timelineHeight + storyboardHeight;
+  const storyboardRailTabBottom = Math.max(0, storyboardRailAnchor - 10);
+  const storyboardRailConnectorBottom = Math.max(0, storyboardRailAnchor - 3);
+  const timelineRailTabBottom = Math.max(0, timelineRailAnchor - 10);
+  const timelineRailConnectorBottom = Math.max(0, timelineRailAnchor - 3);
+  const audioRailTabBottom = Math.max(0, audioRailAnchor - 10);
+  const audioRailConnectorBottom = Math.max(0, audioRailAnchor - 3);
   const previewRatio = outputPreset.w / outputPreset.h;
   const previewMaxWidth = Math.max(260, Math.min(1152, previewAreaSize.w - 48));
   const previewMaxHeight = Math.max(220, previewAreaSize.h - 98);
@@ -1217,6 +1254,58 @@ function Studio() {
                   className="text-foreground/35"
                 />
               </svg>
+              <button
+                onMouseDown={(e) => {
+                  timelineDragRef.current = true;
+                  timelinePressRef.current = { startY: e.clientY };
+                  document.body.style.cursor = "row-resize";
+                  document.body.style.userSelect = "none";
+                }}
+                onClick={() => {
+                  if (timelineSuppressClickRef.current) return;
+                  setTimelineHeight(timelineCollapsed ? 76 : 10);
+                }}
+                className="absolute left-1 flex h-5 w-9 items-center justify-center rounded-[3px] border border-white/10 bg-background/80 text-[5.5px] font-medium lowercase leading-none tracking-[0.01em] text-emerald-200/60 shadow-[0_7px_18px_rgba(0,0,0,0.28)] ring-1 ring-white/5 backdrop-blur transition-colors hover:border-emerald-300/45 hover:text-emerald-100 hover:shadow-[0_0_16px_rgba(110,231,183,0.12)]"
+                style={{ bottom: timelineRailTabBottom }}
+                title={timelineCollapsed ? "Open timeline" : "Drag to resize timeline"}
+              >
+                timeline
+              </button>
+              <svg
+                aria-hidden="true"
+                className="pointer-events-none absolute left-[39px] h-3 w-2.5 overflow-visible text-emerald-300/45"
+                style={{ bottom: timelineRailConnectorBottom }}
+                viewBox="0 0 10 12"
+              >
+                <path d="M 0 6 L 4 6 L 6 9 L 10 9" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="square" strokeLinejoin="miter" />
+                <path d="M 0 6 L 4 6 L 6 9 L 10 9" fill="none" stroke="currentColor" strokeWidth="0.4" strokeLinecap="square" strokeLinejoin="miter" className="text-foreground/35" />
+              </svg>
+              <button
+                onMouseDown={(e) => {
+                  audioDragRef.current = true;
+                  audioPressRef.current = { startY: e.clientY };
+                  document.body.style.cursor = "row-resize";
+                  document.body.style.userSelect = "none";
+                }}
+                onClick={() => {
+                  if (audioSuppressClickRef.current) return;
+                  setAudioHeight(audioCollapsed ? 58 : 10);
+                }}
+                className="absolute left-1 flex h-5 w-9 items-center justify-center rounded-[3px] border border-white/10 bg-background/80 text-[5.5px] font-medium lowercase leading-none tracking-[0.01em] text-amber-200/60 shadow-[0_7px_18px_rgba(0,0,0,0.28)] ring-1 ring-white/5 backdrop-blur transition-colors hover:border-amber-300/45 hover:text-amber-100 hover:shadow-[0_0_16px_rgba(252,211,77,0.12)]"
+                style={{ bottom: audioRailTabBottom }}
+                title={audioCollapsed ? "Open audio" : "Drag to resize audio"}
+              >
+                audio
+              </button>
+              <svg
+                aria-hidden="true"
+                className="pointer-events-none absolute left-[39px] h-3 w-2.5 overflow-visible text-amber-300/45"
+                style={{ bottom: audioRailConnectorBottom }}
+                viewBox="0 0 10 12"
+              >
+                <path d="M 0 6 L 4 6 L 6 9 L 10 9" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="square" strokeLinejoin="miter" />
+                <path d="M 0 6 L 4 6 L 6 9 L 10 9" fill="none" stroke="currentColor" strokeWidth="0.4" strokeLinecap="square" strokeLinejoin="miter" className="text-foreground/35" />
+              </svg>
             </>
           )}
         </aside>
@@ -1554,6 +1643,107 @@ function Studio() {
                   )}
                 </div>
                 </div>
+                )}
+              </div>
+
+              {/* Timeline rail */}
+              <div
+                className="relative shrink-0 border-t border-border bg-panel/50 flex flex-col"
+                style={{ height: timelineHeight }}
+              >
+                <button
+                  onMouseDown={(e) => {
+                    timelineDragRef.current = true;
+                    timelinePressRef.current = { startY: e.clientY };
+                    document.body.style.cursor = "row-resize";
+                    document.body.style.userSelect = "none";
+                  }}
+                  onClick={() => {
+                    if (timelineSuppressClickRef.current) return;
+                    setTimelineHeight(timelineCollapsed ? 76 : 10);
+                  }}
+                  className="h-1 shrink-0 cursor-row-resize bg-border transition-colors hover:bg-emerald-400/60"
+                  title={timelineCollapsed ? "Open timeline" : "Resize timeline"}
+                />
+                {!timelineCollapsed && (
+                  <div className="flex min-h-0 flex-1 items-center gap-2 px-3">
+                    <div className="flex h-full w-24 shrink-0 items-center gap-2 border-r border-border pr-3 text-[11px] text-muted-foreground">
+                      <Clock3 className="h-3.5 w-3.5 text-emerald-200/70" />
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-foreground/80">Timeline</div>
+                        <div className="truncate">{shots.length || 0} clips</div>
+                      </div>
+                    </div>
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+                      {shots.length === 0 ? (
+                        <div className="text-xs text-muted-foreground/70">Video line waits for storyboard shots.</div>
+                      ) : (
+                        shots.map((s, i) => {
+                          const active = selectedShotId === s.id;
+                          return (
+                            <button
+                              key={`clip-${s.id}`}
+                              onClick={() => setSelectedShotId(s.id)}
+                              className={`h-9 min-w-[92px] rounded-md border px-2 text-left transition-colors ${
+                                active ? "border-emerald-300/70 bg-emerald-300/10" : "border-border bg-background/35 hover:border-emerald-300/45"
+                              }`}
+                              title={`Clip ${i + 1}`}
+                            >
+                              <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                                <span>#{i + 1}</span>
+                                <span>3.0s</span>
+                              </div>
+                              <div className="mt-1 h-1 rounded-full bg-emerald-300/45" />
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Audio rail */}
+              <div
+                className="relative shrink-0 border-t border-border bg-panel/45 flex flex-col"
+                style={{ height: audioHeight }}
+              >
+                <button
+                  onMouseDown={(e) => {
+                    audioDragRef.current = true;
+                    audioPressRef.current = { startY: e.clientY };
+                    document.body.style.cursor = "row-resize";
+                    document.body.style.userSelect = "none";
+                  }}
+                  onClick={() => {
+                    if (audioSuppressClickRef.current) return;
+                    setAudioHeight(audioCollapsed ? 58 : 10);
+                  }}
+                  className="h-1 shrink-0 cursor-row-resize bg-border transition-colors hover:bg-amber-300/60"
+                  title={audioCollapsed ? "Open audio" : "Resize audio"}
+                />
+                {!audioCollapsed && (
+                  <div className="flex min-h-0 flex-1 items-center gap-2 px-3">
+                    <button
+                      onClick={() => setAudioMuted((v) => !v)}
+                      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-xs transition-colors ${
+                        audioMuted ? "border-border text-muted-foreground hover:text-foreground" : "border-amber-300/45 bg-amber-300/10 text-foreground"
+                      }`}
+                      title={audioMuted ? "Enable music" : "Mute music"}
+                    >
+                      <Volume2 className="h-3.5 w-3.5" />
+                      {audioMuted ? "Muted" : "Music"}
+                    </button>
+                    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden rounded-md border border-border bg-background/25 px-2 py-1">
+                      {Array.from({ length: 44 }).map((_, i) => (
+                        <div
+                          key={`wave-${i}`}
+                          className={`w-1 rounded-full ${audioMuted ? "bg-muted-foreground/20" : "bg-amber-200/50"}`}
+                          style={{ height: `${8 + ((i * 17) % 22)}px` }}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
 
