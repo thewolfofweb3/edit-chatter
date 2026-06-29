@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import {
-  Image as ImageIcon, Film, Settings,
+  Image as ImageIcon, Film,
   Folder, Download, Upload, Send, ChevronDown, Pause,
   MessageSquarePlus, History, Paperclip,
   SquareDashedMousePointer, MousePointer2, Plus, Brush,
@@ -332,6 +332,7 @@ function Studio() {
 
   const [input, setInput] = useState("");
   const [chatWidth, setChatWidth] = useState(380);
+  const [storyboardHeight, setStoryboardHeight] = useState(112);
   const [shellWidth, setShellWidth] = useState(0);
   const [tool, setTool] = useState<Tool>("select");
   const [sizeIdx, setSizeIdx] = useState(0);
@@ -361,6 +362,9 @@ function Studio() {
   const draggingRef = useRef(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const previewAreaRef = useRef<HTMLDivElement>(null);
+  const storyboardDragRef = useRef(false);
+  const storyboardPressRef = useRef<{ startY: number } | null>(null);
+  const storyboardSuppressClickRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -431,6 +435,36 @@ function Studio() {
 
   useEffect(() => {
     function onMove(e: MouseEvent) {
+      if (!storyboardDragRef.current || !shellRef.current) return;
+      const press = storyboardPressRef.current;
+      if (press && Math.abs(e.clientY - press.startY) > 3) storyboardSuppressClickRef.current = true;
+      const rect = shellRef.current.getBoundingClientRect();
+      const MIN_STORYBOARD = 10;
+      const MAX_STORYBOARD = 112;
+      const SNAP_CLOSE = 28;
+      const raw = rect.bottom - e.clientY;
+      const next = raw < SNAP_CLOSE ? MIN_STORYBOARD : Math.max(MIN_STORYBOARD, Math.min(MAX_STORYBOARD, raw));
+      setStoryboardHeight(next);
+    }
+    function onUp() {
+      if (storyboardDragRef.current) {
+        storyboardDragRef.current = false;
+        storyboardPressRef.current = null;
+        setTimeout(() => { storyboardSuppressClickRef.current = false; }, 0);
+      }
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
       if (!draggingRef.current || !shellRef.current) return;
       const rect = shellRef.current.getBoundingClientRect();
       const available = Math.max(0, rect.width - 48 - 4);
@@ -480,6 +514,7 @@ function Studio() {
 
   const previewWidth = Math.max(0, shellWidth - 48 - 4 - chatWidth);
   const previewCollapsed = shellWidth > 0 && previewWidth < 240;
+  const storyboardCollapsed = storyboardHeight < 44;
   const previewRatio = outputPreset.w / outputPreset.h;
   const previewMaxWidth = Math.max(260, Math.min(1152, previewAreaSize.w - 48));
   const previewMaxHeight = Math.max(220, previewAreaSize.h - 98);
@@ -1142,16 +1177,33 @@ function Studio() {
             </button>
           ))}
           <div className="flex-1" />
-          <button
-            title="Settings"
-            onClick={() => setActiveTab("settings")}
-            className={`h-9 w-9 grid place-items-center rounded-md transition-colors ${
-              activeTab === "settings" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
-            }`}
-          >
-            <Settings className="h-[18px] w-[18px]" />
-          </button>
         </aside>
+
+        {activeTab === "workspace" && (
+          <div
+            className="absolute left-0 z-20 flex w-12 items-center justify-center"
+            style={{ bottom: Math.max(8, storyboardHeight - 24) }}
+          >
+            <div className="absolute left-12 top-1/2 h-px w-5 -translate-y-1/2 bg-border/90" />
+            <button
+              onMouseDown={(e) => {
+                storyboardDragRef.current = true;
+                storyboardPressRef.current = { startY: e.clientY };
+                document.body.style.cursor = "row-resize";
+                document.body.style.userSelect = "none";
+              }}
+              onClick={() => {
+                if (storyboardSuppressClickRef.current) return;
+                setStoryboardHeight(storyboardCollapsed ? 112 : 10);
+              }}
+              className="h-24 w-7 rounded-md border border-border bg-panel/95 text-[10px] font-medium uppercase tracking-wider text-muted-foreground shadow-lg transition-colors hover:border-primary/60 hover:text-foreground"
+              title={storyboardCollapsed ? "Open storyboard" : "Drag to resize storyboard"}
+              style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+            >
+              Storyboard
+            </button>
+          </div>
+        )}
 
         {/* Workspace / panels */}
         <main className="flex-1 flex flex-col min-w-0 bg-canvas overflow-hidden">
@@ -1307,9 +1359,27 @@ function Studio() {
               </div>
 
               {/* Storyboard strip */}
-              <div className="h-28 shrink-0 border-t border-border bg-panel/60 flex items-stretch">
+              <div
+                className="relative shrink-0 border-t border-border bg-panel/60 flex flex-col"
+                style={{ height: storyboardHeight }}
+              >
+                <button
+                  onMouseDown={(e) => {
+                    storyboardDragRef.current = true;
+                    storyboardPressRef.current = { startY: e.clientY };
+                    document.body.style.cursor = "row-resize";
+                    document.body.style.userSelect = "none";
+                  }}
+                  onClick={() => {
+                    if (storyboardSuppressClickRef.current) return;
+                    setStoryboardHeight(storyboardCollapsed ? 112 : 10);
+                  }}
+                  className="h-1 shrink-0 cursor-row-resize bg-border transition-colors hover:bg-primary/60"
+                  title={storyboardCollapsed ? "Open storyboard" : "Resize storyboard"}
+                />
+                {!storyboardCollapsed && (
+                <div className="flex min-h-0 flex-1 items-stretch">
                 <div className="relative shrink-0 flex w-28 flex-col items-center justify-center gap-1.5 px-3" ref={shotPickerRef}>
-                  <div className="text-[11px] uppercase tracking-wider text-foreground/80 font-medium">Storyboard</div>
                   <button
                     onClick={() => setShotPickerOpen((v) => !v)}
                     className={`h-14 w-16 rounded-md border border-dashed grid place-items-center transition-colors ${
@@ -1448,6 +1518,8 @@ function Studio() {
                     })
                   )}
                 </div>
+                </div>
+                )}
               </div>
 
             </>
