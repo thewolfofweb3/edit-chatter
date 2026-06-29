@@ -6,7 +6,7 @@ import {
   MessageSquarePlus, History, Paperclip,
   SquareDashedMousePointer, MousePointer2, Plus, Brush,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
-  LayoutGrid, Library, Save, LayoutTemplate,
+  LayoutGrid, Library, LayoutTemplate,
   Target, Play, Sparkles, Search, CheckCircle2, Clock3, Wand2, Volume2,
 } from "lucide-react";
 import { buildMaskDataUrl, compositeWithMask, dataUrlToBase64, loadImage } from "@/lib/imageOps";
@@ -739,18 +739,6 @@ function Studio() {
     setStrokes([]);
     setCurrentStroke(null);
     setSelection(null);
-  }
-  function downloadPreviewOutput() {
-    const url = previewAsset?.url ?? previewImage;
-    if (!url) return;
-    const ext = previewAsset?.kind === "video" ? "webm" : "png";
-    const name = previewAsset?.name ?? `reel-output-${renderSeed}.${ext}`;
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
   }
   function cuePreviewRefine() {
     if (!hasPreviewOutput) return;
@@ -1543,7 +1531,7 @@ function Studio() {
                   )}
                 </div>
 
-                <div className="relative flex h-10 items-center gap-2 rounded-lg border border-border bg-panel/80 px-2 shadow-lg backdrop-blur" ref={sizeMenuRef}>
+                <div className="relative flex h-10 max-w-full items-center gap-2 rounded-lg border border-border bg-panel/80 px-2 shadow-lg backdrop-blur" ref={sizeMenuRef}>
                   <button
                     onClick={togglePreviewPlayback}
                     disabled={!showVideo}
@@ -1580,15 +1568,12 @@ function Studio() {
                       ))}
                     </div>
                   )}
-                </div>
-
-                <div className="flex h-10 max-w-full items-center gap-1.5 rounded-lg border border-white/10 bg-panel/70 px-2 shadow-lg backdrop-blur">
-                  <div className="flex h-7 items-center gap-1.5 rounded-md border border-white/10 bg-black/25 px-2 text-[11px] text-muted-foreground">
+                  <div className="hidden h-5 w-px bg-border sm:block" />
+                  <div className="hidden h-7 items-center gap-1.5 rounded-md border border-white/10 bg-black/25 px-2 text-[11px] text-muted-foreground sm:flex">
                     <span className={`h-1.5 w-1.5 rounded-full ${hasPreviewOutput ? "bg-emerald-300" : "bg-muted-foreground/35"}`} />
                     <span className="whitespace-nowrap">{outputStatus}</span>
                   </div>
-                  <div className="hidden h-5 w-px bg-border/80 sm:block" />
-                  <div className="flex h-7 overflow-hidden rounded-md border border-white/10 bg-black/20 p-0.5">
+                  <div className="hidden h-7 overflow-hidden rounded-md border border-white/10 bg-black/20 p-0.5 md:flex">
                     {(["draft", "final"] as const).map((mode) => (
                       <button
                         key={mode}
@@ -1601,10 +1586,12 @@ function Studio() {
                       </button>
                     ))}
                   </div>
-                  <div className="hidden h-7 items-center gap-1.5 rounded-md border border-white/10 bg-black/20 px-2 text-[11px] text-muted-foreground md:flex">
+                  {showVideo && (
+                  <div className="hidden h-7 items-center gap-1.5 rounded-md border border-white/10 bg-black/20 px-2 text-[11px] text-muted-foreground lg:flex">
                     <Target className="h-3 w-3 text-foreground/60" />
-                    <span>{showVideo ? previewVideoDuration : outputPreset.w + "x" + outputPreset.h}</span>
+                    <span>{previewVideoDuration}</span>
                   </div>
+                  )}
                   <div className="hidden h-7 items-center rounded-md border border-white/10 bg-black/20 px-2 text-[11px] text-muted-foreground lg:flex">
                     seed {renderSeed}
                   </div>
@@ -1615,22 +1602,6 @@ function Studio() {
                     title="Refine output"
                   >
                     <Wand2 className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={downloadPreviewOutput}
-                    disabled={!hasPreviewOutput}
-                    className="grid h-7 w-7 place-items-center rounded-md border border-white/10 bg-black/20 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
-                    title="Save output"
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={downloadPreviewOutput}
-                    disabled={!hasPreviewOutput}
-                    className="grid h-7 w-7 place-items-center rounded-md border border-white/10 bg-black/20 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
-                    title="Export output"
-                  >
-                    <Download className="h-3.5 w-3.5" />
                   </button>
                 </div>
                 </>
