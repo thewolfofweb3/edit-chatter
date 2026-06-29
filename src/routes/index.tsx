@@ -1250,22 +1250,21 @@ function Studio() {
                   <div className="h-5 w-px bg-border" />
                   <button
                     onClick={() => {
-                      if (hasPreviewOutput) return;
                       setMenu(menu === "size" ? null : "size");
                     }}
-                    className="h-8 min-w-[176px] justify-between rounded-md px-2 text-xs text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-70 flex items-center gap-2"
-                    title={hasPreviewOutput ? "Output size is locked to this generation. Ask for a new size to generate a new output." : "Preview dimensions"}
-                    disabled={hasPreviewOutput}
+                    className="h-8 min-w-[176px] justify-between rounded-md px-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                    title={hasPreviewOutput ? "Inspect dimensions. Current output keeps its generated size until you ask to regenerate it." : "Preview dimensions"}
                   >
                     <span className="truncate">{outputPreset.label}</span>
-                    {!hasPreviewOutput && <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${menu === "size" ? "rotate-180" : ""}`} />}
+                    <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${menu === "size" ? "rotate-180" : ""}`} />
                   </button>
-                  {menu === "size" && !hasPreviewOutput && (
+                  {menu === "size" && (
                     <div className="absolute bottom-full left-10 mb-2 w-64 overflow-hidden rounded-lg border border-border bg-popover shadow-xl z-40">
                       {SIZE_PRESETS.map((preset, idx) => (
                         <button
                           key={preset.label}
                           onClick={() => { setSizeIdx(idx); setMenu(null); }}
+                          title={hasPreviewOutput ? "This sets the target size for the next generation. It will not resize the current output." : undefined}
                           className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-accent ${
                             idx === sizeIdx ? "bg-accent/70 text-foreground" : "text-muted-foreground hover:text-foreground"
                           }`}
@@ -1944,13 +1943,13 @@ function PanelAssets({
                     <div className="relative min-h-0 bg-black">
                       <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 grid h-full w-full place-items-center p-5">
                         <div
-                          className="relative max-h-full max-w-full overflow-hidden rounded-md shadow-sm"
+                          className="relative max-h-full max-w-full overflow-hidden rounded-lg bg-black shadow-sm ring-1 ring-white/5"
                           style={{ aspectRatio: a.ratio ?? "16 / 9", height: "100%" }}
                         >
                           <img
                             src={a.kind === "video" ? (a.poster ?? "") : a.url}
                             alt={a.name}
-                            className="absolute inset-0 h-full w-full bg-black object-contain"
+                            className="absolute inset-0 h-full w-full rounded-lg bg-black object-contain"
                           />
                         </div>
                         {a.kind === "video" && (
