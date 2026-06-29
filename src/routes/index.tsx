@@ -1942,8 +1942,12 @@ function PanelAssets({
                 return (
                   <div key={a.id} className={`group rounded-lg border bg-panel overflow-hidden transition-colors ${selected ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
                     <div className="relative aspect-video bg-black">
-                      <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 h-full w-full">
-                        <img src={a.kind === "video" ? (a.poster ?? "") : a.url} alt={a.name} className="absolute inset-0 h-full w-full object-contain" />
+                      <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 grid h-full w-full place-items-center p-4">
+                        <img
+                          src={a.kind === "video" ? (a.poster ?? "") : a.url}
+                          alt={a.name}
+                          className="block max-h-full max-w-full rounded-md object-contain shadow-sm"
+                        />
                         {a.kind === "video" && (
                           <div className="absolute inset-0 grid place-items-center bg-black/30">
                             <Play className="h-6 w-6 text-white drop-shadow" />
