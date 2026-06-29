@@ -1940,14 +1940,19 @@ function PanelAssets({
               {filtered.map((a) => {
                 const selected = selectedIds.includes(a.id);
                 return (
-                  <div key={a.id} className={`group rounded-lg border bg-panel overflow-hidden transition-colors ${selected ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
-                    <div className="relative aspect-video bg-black">
-                      <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 grid h-full w-full place-items-center p-4">
-                        <img
-                          src={a.kind === "video" ? (a.poster ?? "") : a.url}
-                          alt={a.name}
-                          className="block max-h-full max-w-full rounded-md object-contain shadow-sm"
-                        />
+                  <div key={a.id} className={`group grid h-72 grid-rows-[minmax(0,1fr)_52px] rounded-lg border bg-panel overflow-hidden transition-colors ${selected ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
+                    <div className="relative min-h-0 bg-black">
+                      <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 grid h-full w-full place-items-center p-5">
+                        <div
+                          className="relative max-h-full max-w-full overflow-hidden rounded-md shadow-sm"
+                          style={{ aspectRatio: a.ratio ?? "16 / 9", height: "100%" }}
+                        >
+                          <img
+                            src={a.kind === "video" ? (a.poster ?? "") : a.url}
+                            alt={a.name}
+                            className="absolute inset-0 h-full w-full bg-black object-contain"
+                          />
+                        </div>
                         {a.kind === "video" && (
                           <div className="absolute inset-0 grid place-items-center bg-black/30">
                             <Play className="h-6 w-6 text-white drop-shadow" />
@@ -1962,8 +1967,11 @@ function PanelAssets({
                         title="Select asset"
                       />
                     </div>
-                    <div className="flex items-center justify-between px-2 py-1.5 text-xs">
-                      <span className="truncate">{a.name}</span>
+                    <div className="flex min-h-0 items-center justify-between border-t border-border bg-panel px-3 text-xs">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{a.name}</div>
+                        <div className="mt-0.5 truncate text-[11px] uppercase text-muted-foreground">{a.sizeLabel ?? a.kind}</div>
+                      </div>
                       <button
                         onClick={() => onDelete(a.id)}
                         className="opacity-0 group-hover:opacity-100 h-6 w-6 grid place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-accent shrink-0"
