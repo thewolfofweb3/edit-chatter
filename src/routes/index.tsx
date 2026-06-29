@@ -1158,7 +1158,7 @@ function Studio() {
 
       <div ref={shellRef} className="relative flex-1 flex min-h-0">
         {/* Left icon rail (Tutorials removed) */}
-        <aside className="w-12 bg-rail border-r border-border flex flex-col items-center py-2 gap-1">
+        <aside className="relative z-30 w-12 bg-rail border-r border-border flex flex-col items-center py-2 gap-1 overflow-visible">
           {[
             { id: "workspace", Icon: LayoutGrid, label: "Workspace" },
             { id: "projects", Icon: Folder, label: "Projects" },
@@ -1177,37 +1177,7 @@ function Studio() {
             </button>
           ))}
           <div className="flex-1" />
-        </aside>
-
-        {activeTab === "workspace" && (
-          <div
-            className="pointer-events-none absolute left-0 z-20 h-24 w-20"
-            style={{ bottom: Math.max(8, storyboardHeight - 42) }}
-          >
-            <svg
-              aria-hidden="true"
-              className="absolute left-9 top-[52px] h-14 w-11 overflow-visible"
-              viewBox="0 0 44 56"
-            >
-              <path
-                d="M 0 0 L 15 0 L 15 31 L 44 31"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="square"
-                strokeLinejoin="miter"
-                className="text-primary/65"
-              />
-              <path
-                d="M 0 0 L 15 0 L 15 31 L 44 31"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="0.5"
-                strokeLinecap="square"
-                strokeLinejoin="miter"
-                className="text-foreground/40"
-              />
-            </svg>
+          {activeTab === "workspace" && (
             <button
               onMouseDown={(e) => {
                 storyboardDragRef.current = true;
@@ -1219,18 +1189,44 @@ function Studio() {
                 if (storyboardSuppressClickRef.current) return;
                 setStoryboardHeight(storyboardCollapsed ? 112 : 10);
               }}
-              className="pointer-events-auto absolute left-2 top-0 flex h-24 w-8 flex-col items-center justify-center rounded-md border border-primary/40 bg-panel/95 text-[8px] font-semibold uppercase leading-[0.9] text-foreground shadow-lg ring-1 ring-primary/10 transition-colors hover:border-primary/75 hover:bg-accent/60"
+              className="absolute left-1.5 flex h-9 w-9 flex-col items-center justify-center rounded-md border border-primary/45 bg-panel/95 text-[7px] font-bold uppercase leading-none text-foreground shadow-lg ring-1 ring-primary/10 transition-colors hover:border-primary/80 hover:bg-accent/70"
+              style={{ bottom: Math.max(8, storyboardHeight - 58) }}
               title={storyboardCollapsed ? "Open storyboard" : "Drag to resize storyboard"}
             >
-              {"Story".split("").map((letter, index) => (
-                <span key={`${letter}-${index}`}>{letter}</span>
-              ))}
-              <span className="my-0.5 h-px w-3 bg-primary/60" />
-              {"Board".split("").map((letter, index) => (
-                <span key={`${letter}-${index}`}>{letter}</span>
-              ))}
+              <span>Story</span>
+              <span>Board</span>
             </button>
-          </div>
+          )}
+        </aside>
+
+        {activeTab === "workspace" && (
+          <svg
+            aria-hidden="true"
+            className="pointer-events-none absolute left-8 z-20 h-12 w-20 overflow-visible"
+            style={{ bottom: Math.max(4, storyboardHeight - 34) }}
+            viewBox="0 0 80 48"
+          >
+            <path
+              d="M 0 28 L 18 28 L 38 8 L 80 8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+              className="text-primary/70"
+            />
+            <path
+              d="M 0 28 L 18 28 L 38 8 L 80 8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="0.5"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+              className="text-foreground/50"
+            />
+            <rect x="0" y="25" width="5" height="6" className="fill-primary/70" />
+            <rect x="73" y="5" width="7" height="6" className="fill-primary/70" />
+          </svg>
         )}
 
         {/* Workspace / panels */}
