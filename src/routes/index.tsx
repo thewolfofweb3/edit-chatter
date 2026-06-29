@@ -515,7 +515,8 @@ function Studio() {
   const previewWidth = Math.max(0, shellWidth - 48 - 4 - chatWidth);
   const previewCollapsed = shellWidth > 0 && previewWidth < 240;
   const storyboardCollapsed = storyboardHeight < 44;
-  const storyboardRailAnchor = Math.max(18, storyboardHeight - 10);
+  const storyboardRailTabBottom = Math.max(0, storyboardHeight - 10);
+  const storyboardRailConnectorBottom = Math.max(0, storyboardHeight - 3);
   const previewRatio = outputPreset.w / outputPreset.h;
   const previewMaxWidth = Math.max(260, Math.min(1152, previewAreaSize.w - 48));
   const previewMaxHeight = Math.max(220, previewAreaSize.h - 98);
@@ -1192,7 +1193,7 @@ function Studio() {
                   setStoryboardHeight(storyboardCollapsed ? 112 : 10);
                 }}
                 className="absolute left-1 flex h-5 w-9 items-center justify-center rounded-[3px] border border-white/10 bg-background/80 text-[5.5px] font-medium lowercase leading-none tracking-[0.01em] text-foreground/55 shadow-[0_7px_18px_rgba(0,0,0,0.28)] ring-1 ring-white/5 backdrop-blur transition-colors hover:border-primary/45 hover:text-foreground/90 hover:shadow-[0_0_16px_rgba(255,255,255,0.10)]"
-                style={{ bottom: storyboardRailAnchor - 10 }}
+                style={{ bottom: storyboardRailTabBottom }}
                 title={storyboardCollapsed ? "Open storyboard" : "Drag to resize storyboard"}
               >
                 storyboard
@@ -1200,7 +1201,7 @@ function Studio() {
               <svg
                 aria-hidden="true"
                 className="pointer-events-none absolute left-[39px] h-3 w-2.5 overflow-visible text-primary/45"
-                style={{ bottom: storyboardRailAnchor - 6 }}
+                style={{ bottom: storyboardRailConnectorBottom }}
                 viewBox="0 0 10 12"
               >
                 <path
