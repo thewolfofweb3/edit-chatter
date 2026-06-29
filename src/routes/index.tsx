@@ -1943,7 +1943,7 @@ function PanelAssets({
                   <div key={a.id} className={`group rounded-lg border bg-panel overflow-hidden transition-colors ${selected ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
                     <div className="relative aspect-video bg-black">
                       <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 h-full w-full">
-                        <img src={a.kind === "video" ? (a.poster ?? "") : a.url} alt={a.name} className="absolute inset-0 w-full h-full object-cover" />
+                        <img src={a.kind === "video" ? (a.poster ?? "") : a.url} alt={a.name} className="absolute inset-0 h-full w-full object-contain" />
                         {a.kind === "video" && (
                           <div className="absolute inset-0 grid place-items-center bg-black/30">
                             <Play className="h-6 w-6 text-white drop-shadow" />
@@ -1978,10 +1978,10 @@ function PanelAssets({
               onMouseDown={() => setViewerAssetId(null)}
             >
               <div
-                className="relative flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-panel shadow-2xl"
+                className="relative grid h-[92vh] w-full max-w-5xl grid-rows-[44px_minmax(0,1fr)_48px] overflow-hidden rounded-xl border border-border bg-panel shadow-2xl"
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-3">
+                <div className="flex min-h-0 items-center justify-between border-b border-border px-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{viewerAsset.name}</div>
                     <div className="text-[11px] uppercase text-muted-foreground">{viewerAsset.sizeLabel ?? viewerAsset.kind}</div>
@@ -1994,23 +1994,25 @@ function PanelAssets({
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid h-[calc(92vh-92px)] min-h-0 place-items-center overflow-hidden bg-black/70 p-3">
-                  {viewerAsset.kind === "video" ? (
-                    <video
-                      src={viewerAsset.url}
-                      poster={viewerAsset.poster}
-                      controls
-                      className="block h-auto max-h-full w-auto max-w-full rounded-lg object-contain"
-                    />
-                  ) : (
-                    <img
-                      src={viewerAsset.url}
-                      alt={viewerAsset.name}
-                      className="block h-auto max-h-full w-auto max-w-full rounded-lg object-contain"
-                    />
-                  )}
+                <div className="min-h-0 overflow-auto bg-black/70 p-3">
+                  <div className="flex h-full min-h-full items-center justify-center">
+                    {viewerAsset.kind === "video" ? (
+                      <video
+                        src={viewerAsset.url}
+                        poster={viewerAsset.poster}
+                        controls
+                        className="block max-h-full max-w-full rounded-lg object-contain"
+                      />
+                    ) : (
+                      <img
+                        src={viewerAsset.url}
+                        alt={viewerAsset.name}
+                        className="block max-h-full max-w-full rounded-lg object-contain"
+                      />
+                    )}
+                  </div>
                 </div>
-                <div className="flex h-12 shrink-0 items-center justify-between gap-4 border-t border-border bg-panel px-3">
+                <div className="flex min-h-0 items-center justify-between gap-4 border-t border-border bg-panel px-3">
                   <div className="min-w-0">
                     <div className="truncate text-xs font-medium text-foreground">{viewerAsset.name}</div>
                     <div className="mt-0.5 text-[11px] text-muted-foreground">
