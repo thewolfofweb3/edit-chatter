@@ -1181,10 +1181,33 @@ function Studio() {
 
         {activeTab === "workspace" && (
           <div
-            className="absolute left-0 z-20 flex w-12 items-center justify-center"
-            style={{ bottom: Math.max(8, storyboardHeight - 24) }}
+            className="pointer-events-none absolute left-0 z-20 h-24 w-20"
+            style={{ bottom: Math.max(8, storyboardHeight - 42) }}
           >
-            <div className="absolute left-12 top-1/2 h-px w-5 -translate-y-1/2 bg-border/90" />
+            <svg
+              aria-hidden="true"
+              className="absolute left-9 top-[52px] h-14 w-11 overflow-visible"
+              viewBox="0 0 44 56"
+            >
+              <path
+                d="M 0 0 L 15 0 L 15 31 L 44 31"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="square"
+                strokeLinejoin="miter"
+                className="text-primary/65"
+              />
+              <path
+                d="M 0 0 L 15 0 L 15 31 L 44 31"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="0.5"
+                strokeLinecap="square"
+                strokeLinejoin="miter"
+                className="text-foreground/40"
+              />
+            </svg>
             <button
               onMouseDown={(e) => {
                 storyboardDragRef.current = true;
@@ -1196,11 +1219,16 @@ function Studio() {
                 if (storyboardSuppressClickRef.current) return;
                 setStoryboardHeight(storyboardCollapsed ? 112 : 10);
               }}
-              className="h-24 w-7 rounded-md border border-border bg-panel/95 text-[10px] font-medium uppercase tracking-wider text-muted-foreground shadow-lg transition-colors hover:border-primary/60 hover:text-foreground"
+              className="pointer-events-auto absolute left-2 top-0 flex h-24 w-8 flex-col items-center justify-center rounded-md border border-primary/40 bg-panel/95 text-[8px] font-semibold uppercase leading-[0.9] text-foreground shadow-lg ring-1 ring-primary/10 transition-colors hover:border-primary/75 hover:bg-accent/60"
               title={storyboardCollapsed ? "Open storyboard" : "Drag to resize storyboard"}
-              style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
             >
-              Storyboard
+              {"Story".split("").map((letter, index) => (
+                <span key={`${letter}-${index}`}>{letter}</span>
+              ))}
+              <span className="my-0.5 h-px w-3 bg-primary/60" />
+              {"Board".split("").map((letter, index) => (
+                <span key={`${letter}-${index}`}>{letter}</span>
+              ))}
             </button>
           </div>
         )}
@@ -1374,7 +1402,7 @@ function Studio() {
                     if (storyboardSuppressClickRef.current) return;
                     setStoryboardHeight(storyboardCollapsed ? 112 : 10);
                   }}
-                  className="h-1 shrink-0 cursor-row-resize bg-border transition-colors hover:bg-primary/60"
+                  className="relative h-1 shrink-0 cursor-row-resize bg-border transition-colors before:absolute before:left-0 before:top-1/2 before:h-2 before:w-10 before:-translate-y-1/2 before:bg-primary/50 hover:bg-primary/60"
                   title={storyboardCollapsed ? "Open storyboard" : "Resize storyboard"}
                 />
                 {!storyboardCollapsed && (
