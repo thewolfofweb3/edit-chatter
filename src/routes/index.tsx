@@ -1189,12 +1189,11 @@ function Studio() {
                 if (storyboardSuppressClickRef.current) return;
                 setStoryboardHeight(storyboardCollapsed ? 112 : 10);
               }}
-              className="absolute left-1.5 flex h-9 w-9 flex-col items-center justify-center rounded-md border border-primary/45 bg-panel/95 text-[7px] font-bold uppercase leading-none text-foreground shadow-lg ring-1 ring-primary/10 transition-colors hover:border-primary/80 hover:bg-accent/70"
-              style={{ bottom: Math.max(8, storyboardHeight - 58) }}
+              className="absolute left-1 flex h-5 w-11 items-center justify-center rounded-[3px] border border-sky-400/70 bg-panel/95 text-[7px] font-semibold lowercase leading-none text-sky-300 shadow-lg ring-1 ring-sky-400/20 transition-colors hover:border-sky-300 hover:bg-accent/70"
+              style={{ bottom: Math.max(8, storyboardHeight - 30) }}
               title={storyboardCollapsed ? "Open storyboard" : "Drag to resize storyboard"}
             >
-              <span>Story</span>
-              <span>Board</span>
+              storyboard
             </button>
           )}
         </aside>
@@ -1202,21 +1201,21 @@ function Studio() {
         {activeTab === "workspace" && (
           <svg
             aria-hidden="true"
-            className="pointer-events-none absolute left-8 z-20 h-12 w-20 overflow-visible"
-            style={{ bottom: Math.max(4, storyboardHeight - 34) }}
-            viewBox="0 0 80 48"
+            className="pointer-events-none absolute left-[47px] z-20 h-7 w-20 overflow-visible"
+            style={{ bottom: Math.max(4, storyboardHeight - 33) }}
+            viewBox="0 0 80 28"
           >
             <path
-              d="M 0 28 L 18 28 L 38 8 L 80 8"
+              d="M 0 7 L 23 7 L 34 19 L 80 19"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="1.5"
               strokeLinecap="square"
               strokeLinejoin="miter"
-              className="text-primary/70"
+              className="text-sky-400/80"
             />
             <path
-              d="M 0 28 L 18 28 L 38 8 L 80 8"
+              d="M 0 7 L 23 7 L 34 19 L 80 19"
               fill="none"
               stroke="currentColor"
               strokeWidth="0.5"
@@ -1224,8 +1223,7 @@ function Studio() {
               strokeLinejoin="miter"
               className="text-foreground/50"
             />
-            <rect x="0" y="25" width="5" height="6" className="fill-primary/70" />
-            <rect x="73" y="5" width="7" height="6" className="fill-primary/70" />
+            <rect x="0" y="4" width="4" height="6" className="fill-sky-400/80" />
           </svg>
         )}
 
