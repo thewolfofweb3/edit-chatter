@@ -515,6 +515,7 @@ function Studio() {
   const previewWidth = Math.max(0, shellWidth - 48 - 4 - chatWidth);
   const previewCollapsed = shellWidth > 0 && previewWidth < 240;
   const storyboardCollapsed = storyboardHeight < 44;
+  const storyboardRailAnchor = Math.max(18, storyboardHeight - 10);
   const previewRatio = outputPreset.w / outputPreset.h;
   const previewMaxWidth = Math.max(260, Math.min(1152, previewAreaSize.w - 48));
   const previewMaxHeight = Math.max(220, previewAreaSize.h - 98);
@@ -1190,7 +1191,7 @@ function Studio() {
                 setStoryboardHeight(storyboardCollapsed ? 112 : 10);
               }}
               className="absolute left-1 flex h-5 w-10 items-center justify-center rounded-[3px] border border-border bg-panel/95 text-[6px] font-medium lowercase leading-none text-muted-foreground shadow-lg ring-1 ring-white/5 transition-colors hover:border-primary/55 hover:text-foreground hover:shadow-[0_0_14px_rgba(255,255,255,0.12)]"
-              style={{ bottom: Math.max(8, storyboardHeight - 30) }}
+              style={{ bottom: storyboardRailAnchor - 10 }}
               title={storyboardCollapsed ? "Open storyboard" : "Drag to resize storyboard"}
             >
               storyboard
@@ -1202,7 +1203,7 @@ function Studio() {
           <svg
             aria-hidden="true"
             className="pointer-events-none absolute left-8 z-20 h-5 w-4 overflow-visible"
-            style={{ bottom: Math.max(8, storyboardHeight - 28) }}
+            style={{ bottom: storyboardRailAnchor - 10 }}
             viewBox="0 0 16 20"
           >
             <path
