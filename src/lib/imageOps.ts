@@ -21,6 +21,7 @@ export function buildMaskDataUrl(
   outW: number,
   outH: number,
   brushRadiusDisplay = 18,
+  selections: { x: number; y: number; w: number; h: number }[] = [],
 ): string {
   const c = document.createElement("canvas");
   c.width = outW;
@@ -38,6 +39,10 @@ export function buildMaskDataUrl(
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.lineWidth = radius * 2;
+
+  for (const r of selections) {
+    ctx.fillRect(r.x * sx, r.y * sy, r.w * sx, r.h * sy);
+  }
 
   for (const s of strokes) {
     if (s.length === 0) continue;

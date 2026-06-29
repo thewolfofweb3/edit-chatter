@@ -524,6 +524,9 @@ function Studio() {
     previewMaxWidth / previewMaxHeight > previewRatio
       ? { width: previewMaxHeight * previewRatio, height: previewMaxHeight }
       : { width: previewMaxWidth, height: previewMaxWidth / previewRatio };
+  const activePageLabel = activeTab === "workspace"
+    ? "Workspace"
+    : activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -880,16 +883,17 @@ function Studio() {
     const activePreset = requestedPresetIdx !== null ? SIZE_PRESETS[requestedPresetIdx] : selectedPreset;
     if (requestedPresetIdx !== null && requestedPresetIdx !== sizeIdx) setSizeIdx(requestedPresetIdx);
 
-    const hasStrokes = strokes.length > 0 && !!visibleImage && !showVideo;
+    const activeSelections = selection ? [selection] : [];
+    const hasMarkedRegion = (strokes.length > 0 || activeSelections.length > 0) && !!visibleImage && !showVideo;
     const userAtts: Attachment[] = [...pendingAttachments];
     let maskDataUrl: string | null = null;
 
-    if (hasStrokes && visibleImage && canvasRef.current) {
+    if (hasMarkedRegion && visibleImage && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
       try {
         const img = await loadImage(visibleImage);
         maskDataUrl = buildMaskDataUrl(
-          strokes, rect.width, rect.height, img.naturalWidth, img.naturalHeight, settings.brushSize,
+          strokes, rect.width, rect.height, img.naturalWidth, img.naturalHeight, settings.brushSize, activeSelections,
         );
         const chip = document.createElement("canvas");
         chip.width = img.naturalWidth; chip.height = img.naturalHeight;
@@ -906,7 +910,7 @@ function Studio() {
         tctx.fillRect(0, 0, tint.width, tint.height);
         cctx.drawImage(tint, 0, 0);
         cctx.globalAlpha = 1;
-        userAtts.push({ id: Date.now(), name: "highlighted-region.png", type: "image/png", url: chip.toDataURL("image/png") });
+        userAtts.push({ id: Date.now(), name: "marked-region.png", type: "image/png", url: chip.toDataURL("image/png") });
       } catch (e) {
         console.error("mask snapshot failed", e);
       }
@@ -936,7 +940,7 @@ function Studio() {
         body: JSON.stringify({
           messages: history,
           hasImage: !!visibleImage,
-          hasMask: hasStrokes,
+          hasMask: hasMarkedRegion,
           mode,
           workspace: {
             projectName,
@@ -964,7 +968,7 @@ function Studio() {
 
       if (decision.reply) pushMessage("ai", decision.reply);
 
-      const isEdit = !!decision.isEdit && !!visibleImage && hasStrokes;
+      const isEdit = !!decision.isEdit && !!visibleImage && hasMarkedRegion;
       const imgPrompt = `${decision.prompt || t}\n\nOutput format: ${activePreset.label}. Compose for ${activePreset.w}x${activePreset.h} (${activePreset.ratio}) and fill the frame edge to edge without letterboxing or empty borders.`;
 
       const r = await fetch("/api/image", {
@@ -1120,7 +1124,7 @@ function Studio() {
       {/* Top bar */}
       <header className="h-10 flex items-center justify-between px-3 border-b border-border bg-panel text-sm">
         <div className="flex items-center gap-3">
-          <button className="text-muted-foreground hover:text-foreground transition-colors">Workspace</button>
+          <button className="text-muted-foreground hover:text-foreground transition-colors">{activePageLabel}</button>
           <span className="text-muted-foreground/60">/</span>
           {projectRenaming ? (
             <input
@@ -1309,29 +1313,46 @@ function Studio() {
                         </filter>
                       </defs>
                       {strokes.map((s, i) => (
-                        <polyline
-                          key={i}
-                          points={s.map((p) => `${p.x},${p.y}`).join(" ")}
-                          fill="none"
-                          stroke={settings.brushColor}
-                          strokeOpacity={0.55}
-                          strokeWidth={settings.brushSize}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          filter="url(#brushGlow)"
-                        />
+                        <g key={i} filter="url(#brushGlow)">
+                          <polyline
+                            points={s.map((p) => `${p.x},${p.y}`).join(" ")}
+                            fill="none"
+                            stroke={settings.brushColor}
+                            strokeOpacity={0.55}
+                            strokeWidth={settings.brushSize}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          {s[0] && (
+                            <circle
+                              cx={s[0].x}
+                              cy={s[0].y}
+                              r={settings.brushSize / 2}
+                              fill={settings.brushColor}
+                              fillOpacity={0.55}
+                            />
+                          )}
+                        </g>
                       ))}
                       {currentStroke && currentStroke.length > 0 && (
-                        <polyline
-                          points={currentStroke.map((p) => `${p.x},${p.y}`).join(" ")}
-                          fill="none"
-                          stroke={settings.brushColor}
-                          strokeOpacity={0.55}
-                          strokeWidth={settings.brushSize}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          filter="url(#brushGlow)"
-                        />
+                        <g filter="url(#brushGlow)">
+                          <polyline
+                            points={currentStroke.map((p) => `${p.x},${p.y}`).join(" ")}
+                            fill="none"
+                            stroke={settings.brushColor}
+                            strokeOpacity={0.55}
+                            strokeWidth={settings.brushSize}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <circle
+                            cx={currentStroke[0].x}
+                            cy={currentStroke[0].y}
+                            r={settings.brushSize / 2}
+                            fill={settings.brushColor}
+                            fillOpacity={0.55}
+                          />
+                        </g>
                       )}
                     </svg>
                   )}
