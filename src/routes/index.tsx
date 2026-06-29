@@ -1345,13 +1345,15 @@ function Studio() {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           />
-                          <circle
-                            cx={currentStroke[0].x}
-                            cy={currentStroke[0].y}
-                            r={settings.brushSize / 2}
-                            fill={settings.brushColor}
-                            fillOpacity={0.55}
-                          />
+                          {currentStroke[0] && (
+                            <circle
+                              cx={currentStroke[0].x}
+                              cy={currentStroke[0].y}
+                              r={settings.brushSize / 2}
+                              fill={settings.brushColor}
+                              fillOpacity={0.55}
+                            />
+                          )}
                         </g>
                       )}
                     </svg>
