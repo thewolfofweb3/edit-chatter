@@ -41,6 +41,7 @@ type Asset = {
   height?: number;
   ratio?: string;
   sizeLabel?: string;
+  styleSeed?: string;
   createdAt: number;
 };
 type Shot = { id: number; assetId: number; label: string };
@@ -100,6 +101,11 @@ function makeMockImage(seedText: string, w = 1280, h = 720): string {
   // hash for repeatable colors
   let h1 = 0;
   for (let i = 0; i < seedText.length; i++) h1 = (h1 * 31 + seedText.charCodeAt(i)) & 0xffffffff;
+  let randState = Math.abs(h1) || 1;
+  const rand = () => {
+    randState = (randState * 1664525 + 1013904223) >>> 0;
+    return randState / 4294967296;
+  };
   const hue = Math.abs(h1) % 360;
   const g = ctx.createLinearGradient(0, 0, w, h);
   g.addColorStop(0, `hsl(${hue}, 70%, 22%)`);
@@ -109,8 +115,8 @@ function makeMockImage(seedText: string, w = 1280, h = 720): string {
   ctx.fillRect(0, 0, w, h);
   // bokeh circles
   for (let i = 0; i < 24; i++) {
-    const x = Math.random() * w, y = Math.random() * h;
-    const r = 20 + Math.random() * 120;
+    const x = rand() * w, y = rand() * h;
+    const r = 20 + rand() * 120;
     const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
     rg.addColorStop(0, `hsla(${(hue + 120) % 360}, 90%, 75%, 0.35)`);
     rg.addColorStop(1, "hsla(0,0%,0%,0)");
@@ -125,20 +131,6 @@ function makeMockImage(seedText: string, w = 1280, h = 720): string {
   ctx.font = `400 ${Math.round(h * 0.025)}px Inter, system-ui, sans-serif`;
   ctx.fillStyle = "rgba(255,255,255,0.55)";
   ctx.fillText("mock preview · generated locally", w / 2, h / 2 + h * 0.08);
-  return c.toDataURL("image/png");
-}
-
-async function resizeImageAssetDataUrl(asset: Asset, preset: Preset): Promise<string> {
-  const img = await loadImage(asset.url);
-  const c = document.createElement("canvas");
-  c.width = preset.w; c.height = preset.h;
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, c.width, c.height);
-  const scale = Math.min(c.width / img.naturalWidth, c.height / img.naturalHeight);
-  const w = img.naturalWidth * scale;
-  const h = img.naturalHeight * scale;
-  ctx.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
   return c.toDataURL("image/png");
 }
 
@@ -629,7 +621,8 @@ function Studio() {
     return imageAssets.length === 1 ? imageAssets[0] : null;
   }
   async function convertAssetToPreset(asset: Asset, preset: Preset) {
-    const url = await resizeImageAssetDataUrl(asset, preset);
+    const seed = asset.styleSeed ?? asset.name.replace(/\.[^.]+$/, "");
+    const url = makeMockImage(seed, preset.w, preset.h);
     const next: Asset = {
       ...asset,
       url,
@@ -637,6 +630,7 @@ function Studio() {
       height: preset.h,
       ratio: preset.ratio,
       sizeLabel: preset.label,
+      styleSeed: seed,
     };
     setAssets((xs) => xs.map((a) => (a.id === asset.id ? next : a)));
     setPreviewAssetId(next.id);
@@ -674,7 +668,7 @@ function Studio() {
     const wantsClear = /\b(clear|remove|delete|empty|reset)\b/.test(t);
     const wantsDimensionChange = requestedPresetIdx !== null && /\b(same|exact|resize|dimension|dimensions|convert|change|make it|regenerate|reframe)\b/.test(t) && /\b(asset|image|picture|output|preview)\b/.test(t);
     if (wantsDimensionChange) {
-      setThinkingLabel("Reframing asset");
+      setThinkingLabel("Regenerating asset");
       await wait(450);
       const source = findAssetForDimensionCommand(t);
       if (!source) {
@@ -682,7 +676,7 @@ function Studio() {
         return true;
       }
       const next = await convertAssetToPreset(source, activePreset);
-      pushMessage("ai", `Reframed ${next.name} to ${activePreset.label}.`, undefined, { typing: "deliberate" });
+      pushMessage("ai", `Regenerated ${next.name} in ${activePreset.label} while keeping the same style seed.`, undefined, { typing: "deliberate" });
       return true;
     }
     if (/\b(delete|remove|trash)\b/.test(t) && /\b(asset|image|picture|media|output)\b/.test(t)) {
@@ -794,6 +788,7 @@ function Studio() {
         height: preset.h,
         ratio: preset.ratio,
         sizeLabel: preset.label,
+        styleSeed: `${text}${intent.count > 1 ? ` - ${i + 1}` : ""}`,
       }));
     }
 
@@ -941,6 +936,7 @@ function Studio() {
         height: activePreset.h,
         ratio: activePreset.ratio,
         sizeLabel: activePreset.label,
+        styleSeed: decision.prompt || t,
       });
       setPreviewImage(finalDataUrl);
       setPreviewAssetId(a.id);
@@ -1460,6 +1456,7 @@ function Studio() {
                   height: tplPreset.h,
                   ratio: tplPreset.ratio,
                   sizeLabel: tplPreset.label,
+                  styleSeed: tpl.name,
                 });
                 setPreviewAssetId(a.id); setPreviewImage(url);
                 setActiveTab("workspace");
