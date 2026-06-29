@@ -1189,7 +1189,7 @@ function Studio() {
                 if (storyboardSuppressClickRef.current) return;
                 setStoryboardHeight(storyboardCollapsed ? 112 : 10);
               }}
-              className="absolute left-1 flex h-5 w-11 items-center justify-center rounded-[3px] border border-sky-400/70 bg-panel/95 text-[7px] font-semibold lowercase leading-none text-sky-300 shadow-lg ring-1 ring-sky-400/20 transition-colors hover:border-sky-300 hover:bg-accent/70"
+              className="absolute left-1 flex h-5 w-10 items-center justify-center rounded-[3px] border border-border bg-panel/95 text-[6px] font-medium lowercase leading-none text-muted-foreground shadow-lg ring-1 ring-white/5 transition-colors hover:border-primary/55 hover:text-foreground hover:shadow-[0_0_14px_rgba(255,255,255,0.12)]"
               style={{ bottom: Math.max(8, storyboardHeight - 30) }}
               title={storyboardCollapsed ? "Open storyboard" : "Drag to resize storyboard"}
             >
@@ -1201,29 +1201,28 @@ function Studio() {
         {activeTab === "workspace" && (
           <svg
             aria-hidden="true"
-            className="pointer-events-none absolute left-[47px] z-20 h-7 w-20 overflow-visible"
-            style={{ bottom: Math.max(4, storyboardHeight - 33) }}
-            viewBox="0 0 80 28"
+            className="pointer-events-none absolute left-8 z-20 h-5 w-4 overflow-visible"
+            style={{ bottom: Math.max(8, storyboardHeight - 28) }}
+            viewBox="0 0 16 20"
           >
             <path
-              d="M 0 7 L 23 7 L 34 19 L 80 19"
+              d="M 0 6 L 7 6 L 11 12 L 16 12"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.5"
+              strokeWidth="1.25"
               strokeLinecap="square"
               strokeLinejoin="miter"
-              className="text-sky-400/80"
+              className="text-primary/55"
             />
             <path
-              d="M 0 7 L 23 7 L 34 19 L 80 19"
+              d="M 0 6 L 7 6 L 11 12 L 16 12"
               fill="none"
               stroke="currentColor"
               strokeWidth="0.5"
               strokeLinecap="square"
               strokeLinejoin="miter"
-              className="text-foreground/50"
+              className="text-foreground/35"
             />
-            <rect x="0" y="4" width="4" height="6" className="fill-sky-400/80" />
           </svg>
         )}
 
@@ -1396,7 +1395,7 @@ function Studio() {
                     if (storyboardSuppressClickRef.current) return;
                     setStoryboardHeight(storyboardCollapsed ? 112 : 10);
                   }}
-                  className="relative h-1 shrink-0 cursor-row-resize bg-border transition-colors before:absolute before:left-0 before:top-1/2 before:h-2 before:w-10 before:-translate-y-1/2 before:bg-primary/50 hover:bg-primary/60"
+                  className="h-1 shrink-0 cursor-row-resize bg-border transition-colors hover:bg-primary/60"
                   title={storyboardCollapsed ? "Open storyboard" : "Resize storyboard"}
                 />
                 {!storyboardCollapsed && (
