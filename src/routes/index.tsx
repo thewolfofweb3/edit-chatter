@@ -368,6 +368,35 @@ function Studio() {
   const visibleImage = !showVideo ? (previewAsset?.url ?? previewImage) : null;
   const outputPreset = presetFromAsset(previewAsset, selectedPreset);
   const hasPreviewOutput = !!previewAsset || !!previewImage;
+  const storyboardCollapsed = storyboardHeight < 44;
+  const timelineCollapsed = timelineHeight < 36;
+  const audioCollapsed = audioHeight < 34;
+  const railOrder: WorkspaceRail[] = [
+    activeRail,
+    ...(["storyboard", "timeline", "audio"] as WorkspaceRail[]).filter((rail) => rail !== activeRail),
+  ];
+  const railHeightMap: Record<WorkspaceRail, number> = {
+    storyboard: storyboardHeight,
+    timeline: timelineHeight,
+    audio: audioHeight,
+  };
+  const railAnchorFor = (rail: WorkspaceRail) => {
+    let anchor = 0;
+    for (let i = railOrder.length - 1; i >= 0; i--) {
+      anchor += railHeightMap[railOrder[i]];
+      if (railOrder[i] === rail) return anchor;
+    }
+    return anchor;
+  };
+  const audioRailAnchor = railAnchorFor("audio");
+  const timelineRailAnchor = railAnchorFor("timeline");
+  const storyboardRailAnchor = railAnchorFor("storyboard");
+  const storyboardRailTabBottom = Math.max(0, storyboardRailAnchor - 10);
+  const storyboardRailConnectorBottom = Math.max(0, storyboardRailAnchor - 3);
+  const timelineRailTabBottom = Math.max(0, timelineRailAnchor - 10);
+  const timelineRailConnectorBottom = Math.max(0, timelineRailAnchor - 3);
+  const audioRailTabBottom = Math.max(0, audioRailAnchor - 10);
+  const audioRailConnectorBottom = Math.max(0, audioRailAnchor - 3);
 
   const draggingRef = useRef(false);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -451,9 +480,9 @@ function Studio() {
 
   function openWorkspaceRail(rail: WorkspaceRail) {
     setActiveRail(rail);
-    setStoryboardHeight(rail === "storyboard" ? STORYBOARD_OPEN : RAIL_CLOSED);
-    setTimelineHeight(rail === "timeline" ? TIMELINE_OPEN : RAIL_CLOSED);
-    setAudioHeight(rail === "audio" ? AUDIO_OPEN : RAIL_CLOSED);
+    if (rail === "storyboard") setStoryboardHeight(STORYBOARD_OPEN);
+    if (rail === "timeline") setTimelineHeight(TIMELINE_OPEN);
+    if (rail === "audio") setAudioHeight(AUDIO_OPEN);
   }
 
   function toggleWorkspaceRail(rail: WorkspaceRail) {
@@ -471,6 +500,14 @@ function Studio() {
   }
 
   useEffect(() => {
+    const heightBelowRail = (rail: WorkspaceRail) => {
+      const index = railOrder.indexOf(rail);
+      if (index < 0) return 0;
+      return railOrder
+        .slice(index + 1)
+        .reduce((sum, current) => sum + railHeightMap[current], 0);
+    };
+
     function onMove(e: MouseEvent) {
       if (!shellRef.current) return;
       const rect = shellRef.current.getBoundingClientRect();
@@ -478,17 +515,17 @@ function Studio() {
       if (storyboardDragRef.current) {
         const press = storyboardPressRef.current;
         if (press && Math.abs(e.clientY - press.startY) > 3) storyboardSuppressClickRef.current = true;
-        const raw = rect.bottom - e.clientY - RAIL_CLOSED * 2;
+        const raw = rect.bottom - e.clientY - heightBelowRail("storyboard");
         setStoryboardHeight(raw < SNAP_CLOSE ? RAIL_CLOSED : Math.max(RAIL_CLOSED, Math.min(STORYBOARD_OPEN, raw)));
       } else if (timelineDragRef.current) {
         const press = timelinePressRef.current;
         if (press && Math.abs(e.clientY - press.startY) > 3) timelineSuppressClickRef.current = true;
-        const raw = rect.bottom - e.clientY - RAIL_CLOSED;
+        const raw = rect.bottom - e.clientY - heightBelowRail("timeline");
         setTimelineHeight(raw < SNAP_CLOSE ? RAIL_CLOSED : Math.max(RAIL_CLOSED, Math.min(TIMELINE_OPEN, raw)));
       } else if (audioDragRef.current) {
         const press = audioPressRef.current;
         if (press && Math.abs(e.clientY - press.startY) > 3) audioSuppressClickRef.current = true;
-        const raw = rect.bottom - e.clientY;
+        const raw = rect.bottom - e.clientY - heightBelowRail("audio");
         setAudioHeight(raw < SNAP_CLOSE ? RAIL_CLOSED : Math.max(RAIL_CLOSED, Math.min(AUDIO_OPEN, raw)));
       }
     }
@@ -517,7 +554,7 @@ function Studio() {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, []);
+  }, [railHeightMap, railOrder]);
 
   useEffect(() => {
     function onMove(e: MouseEvent) {
@@ -570,35 +607,6 @@ function Studio() {
 
   const previewWidth = Math.max(0, shellWidth - 48 - 4 - chatWidth);
   const previewCollapsed = shellWidth > 0 && previewWidth < 240;
-  const storyboardCollapsed = storyboardHeight < 44;
-  const timelineCollapsed = timelineHeight < 36;
-  const audioCollapsed = audioHeight < 34;
-  const railOrder: WorkspaceRail[] = [
-    activeRail,
-    ...(["storyboard", "timeline", "audio"] as WorkspaceRail[]).filter((rail) => rail !== activeRail),
-  ];
-  const railHeightMap: Record<WorkspaceRail, number> = {
-    storyboard: storyboardHeight,
-    timeline: timelineHeight,
-    audio: audioHeight,
-  };
-  const railAnchorFor = (rail: WorkspaceRail) => {
-    let anchor = 0;
-    for (let i = railOrder.length - 1; i >= 0; i--) {
-      anchor += railHeightMap[railOrder[i]];
-      if (railOrder[i] === rail) return anchor;
-    }
-    return anchor;
-  };
-  const audioRailAnchor = railAnchorFor("audio");
-  const timelineRailAnchor = railAnchorFor("timeline");
-  const storyboardRailAnchor = railAnchorFor("storyboard");
-  const storyboardRailTabBottom = Math.max(0, storyboardRailAnchor - 10);
-  const storyboardRailConnectorBottom = Math.max(0, storyboardRailAnchor - 3);
-  const timelineRailTabBottom = Math.max(0, timelineRailAnchor - 10);
-  const timelineRailConnectorBottom = Math.max(0, timelineRailAnchor - 3);
-  const audioRailTabBottom = Math.max(0, audioRailAnchor - 10);
-  const audioRailConnectorBottom = Math.max(0, audioRailAnchor - 3);
   const previewRatio = outputPreset.w / outputPreset.h;
   const previewMaxWidth = Math.max(260, Math.min(1152, previewAreaSize.w - 48));
   const previewMaxHeight = Math.max(220, previewAreaSize.h - 98);
@@ -1262,8 +1270,6 @@ function Studio() {
               <button
                 onMouseDown={(e) => {
                   setActiveRail("storyboard");
-                  setTimelineHeight(RAIL_CLOSED);
-                  setAudioHeight(RAIL_CLOSED);
                   storyboardDragRef.current = true;
                   storyboardPressRef.current = { startY: e.clientY };
                   document.body.style.cursor = "row-resize";
@@ -1306,8 +1312,6 @@ function Studio() {
               <button
                 onMouseDown={(e) => {
                   setActiveRail("timeline");
-                  setStoryboardHeight(RAIL_CLOSED);
-                  setAudioHeight(RAIL_CLOSED);
                   timelineDragRef.current = true;
                   timelinePressRef.current = { startY: e.clientY };
                   document.body.style.cursor = "row-resize";
@@ -1335,8 +1339,6 @@ function Studio() {
               <button
                 onMouseDown={(e) => {
                   setActiveRail("audio");
-                  setStoryboardHeight(RAIL_CLOSED);
-                  setTimelineHeight(RAIL_CLOSED);
                   audioDragRef.current = true;
                   audioPressRef.current = { startY: e.clientY };
                   document.body.style.cursor = "row-resize";
@@ -1545,8 +1547,6 @@ function Studio() {
                 <button
                   onMouseDown={(e) => {
                     setActiveRail("storyboard");
-                    setTimelineHeight(RAIL_CLOSED);
-                    setAudioHeight(RAIL_CLOSED);
                     storyboardDragRef.current = true;
                     storyboardPressRef.current = { startY: e.clientY };
                     document.body.style.cursor = "row-resize";
@@ -1712,8 +1712,6 @@ function Studio() {
                 <button
                   onMouseDown={(e) => {
                     setActiveRail("timeline");
-                    setStoryboardHeight(RAIL_CLOSED);
-                    setAudioHeight(RAIL_CLOSED);
                     timelineDragRef.current = true;
                     timelinePressRef.current = { startY: e.clientY };
                     document.body.style.cursor = "row-resize";
@@ -1727,18 +1725,18 @@ function Studio() {
                   title={timelineCollapsed ? "Open timeline" : "Resize timeline"}
                 />
                 {!timelineCollapsed && (
-                  <div className="flex min-h-0 flex-1 items-center gap-3 px-3">
-                    <div className="flex h-full w-24 shrink-0 items-center gap-2 border-r border-border/80 pr-3 text-[11px] text-muted-foreground">
-                      <Film className="h-3.5 w-3.5 text-emerald-200/70" />
+                  <div className="flex min-h-0 flex-1 items-center gap-2.5 px-3">
+                    <div className="flex h-10 w-24 shrink-0 items-center gap-2 rounded-md border border-white/10 bg-black/25 px-2 text-[11px] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                      <Film className="h-3.5 w-3.5 text-foreground/70" />
                       <div className="min-w-0">
                         <div className="text-xs font-medium text-foreground/80">Video</div>
                         <div className="truncate">{previewVideoDuration}</div>
                       </div>
                     </div>
-                    <div className="relative h-12 min-w-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-black/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <div className="relative h-12 min-w-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-[#08090b]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                       <div className="absolute inset-x-0 top-0 flex h-3 items-start justify-between border-b border-white/5 px-2">
                         {Array.from({ length: 9 }).map((_, i) => (
-                          <span key={`video-tick-${i}`} className="h-1.5 w-px bg-white/15" />
+                          <span key={`video-tick-${i}`} className="h-1.5 w-px bg-white/12" />
                         ))}
                       </div>
                       <div className="absolute inset-x-2 bottom-1.5 top-4 rounded bg-background/35">
@@ -1760,11 +1758,11 @@ function Studio() {
                           </button>
                         ) : (
                           <div className="absolute inset-0 flex items-center rounded border border-dashed border-white/10 px-3 text-[11px] text-muted-foreground/65">
-                            Video output track
+                            Preview output track
                           </div>
                         )}
                       </div>
-                      <div className="absolute bottom-1 top-0 left-[18%] w-px bg-emerald-200/70 shadow-[0_0_10px_rgba(110,231,183,0.45)]" />
+                      <div className="absolute bottom-1 top-0 left-[18%] w-px bg-white/45 shadow-[0_0_10px_rgba(255,255,255,0.2)]" />
                     </div>
                   </div>
                 )}
@@ -1778,8 +1776,6 @@ function Studio() {
                 <button
                   onMouseDown={(e) => {
                     setActiveRail("audio");
-                    setStoryboardHeight(RAIL_CLOSED);
-                    setTimelineHeight(RAIL_CLOSED);
                     audioDragRef.current = true;
                     audioPressRef.current = { startY: e.clientY };
                     document.body.style.cursor = "row-resize";
@@ -1793,34 +1789,50 @@ function Studio() {
                   title={audioCollapsed ? "Open audio" : "Resize audio"}
                 />
                 {!audioCollapsed && (
-                  <div className="flex min-h-0 flex-1 items-center gap-3 px-3">
-                    <button
-                      onClick={() => setAudioMuted((v) => !v)}
-                      className={`flex h-8 w-24 shrink-0 items-center gap-1.5 rounded-md border px-2 text-xs transition-colors ${
-                        audioMuted ? "border-border/80 text-muted-foreground hover:text-foreground" : "border-amber-200/35 bg-white/[0.03] text-foreground"
-                      }`}
-                      title={audioMuted ? "Enable music" : "Mute music"}
-                    >
-                      <Volume2 className="h-3.5 w-3.5" />
-                      {audioMuted ? "Muted" : "Music"}
-                    </button>
-                    <div className="relative h-10 min-w-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-black/35 px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <div className="absolute inset-x-0 top-1 flex justify-between px-2">
+                  <div className="flex min-h-0 flex-1 items-center gap-2.5 px-3">
+                    <div className="flex h-10 w-24 shrink-0 items-center gap-2 rounded-md border border-white/10 bg-black/25 px-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                      <button
+                        onClick={() => setAudioMuted((v) => !v)}
+                        className={`grid h-7 w-7 shrink-0 place-items-center rounded border transition-colors ${
+                          audioMuted ? "border-white/10 bg-black/35 text-muted-foreground hover:text-foreground" : "border-white/20 bg-white/[0.06] text-foreground hover:bg-white/[0.09]"
+                        }`}
+                        title={audioMuted ? "Enable music" : "Mute music"}
+                      >
+                        <Volume2 className="h-3.5 w-3.5" />
+                      </button>
+                      <div className="min-w-0 text-[11px] leading-tight">
+                        <div className="text-xs font-medium text-foreground/80">Audio</div>
+                        <div className="truncate text-muted-foreground">{audioMuted ? "muted" : "bed 0 dB"}</div>
+                      </div>
+                    </div>
+                    <div className="relative h-10 min-w-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-[#08090b]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                      <div className="absolute inset-x-0 top-0 flex h-2.5 justify-between px-2">
                         {Array.from({ length: 12 }).map((_, i) => (
-                          <span key={`audio-tick-${i}`} className="h-1 w-px bg-white/10" />
+                          <span key={`audio-tick-${i}`} className="h-1.5 w-px bg-white/10" />
                         ))}
                       </div>
                       <div className="absolute left-3 right-3 top-1/2 h-px bg-white/10" />
-                      <div className="absolute inset-y-1 left-3 right-3 flex items-center gap-1">
-                        {Array.from({ length: 58 }).map((_, i) => (
-                        <div
-                          key={`wave-${i}`}
-                          className={`w-1 rounded-full ${audioMuted ? "bg-muted-foreground/18" : "bg-amber-100/55"}`}
-                          style={{ height: `${5 + ((i * 19) % 24)}px` }}
+                      <svg
+                        aria-hidden="true"
+                        className={`absolute inset-x-3 top-2 h-6 w-[calc(100%-1.5rem)] ${audioMuted ? "opacity-30" : "opacity-90"}`}
+                        viewBox="0 0 800 40"
+                        preserveAspectRatio="none"
+                      >
+                        <path
+                          d="M0 20 C28 14 45 10 70 20 S120 28 150 18 S205 8 244 19 S305 31 352 18 S424 9 470 22 S535 33 588 19 S665 7 710 20 S768 28 800 18"
+                          fill="none"
+                          stroke="rgba(255,255,255,0.28)"
+                          strokeWidth="1.4"
                         />
-                      ))}
-                      </div>
-                      <div className="absolute left-3 top-1 text-[9px] uppercase text-muted-foreground/55">music bed</div>
+                        <path
+                          d="M0 20 C35 24 58 31 92 20 S144 9 185 21 S238 30 284 20 S352 8 405 21 S486 32 535 19 S600 10 646 20 S730 29 800 20"
+                          fill="none"
+                          stroke={audioMuted ? "rgba(148,163,184,0.36)" : "rgba(245,222,179,0.72)"}
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute bottom-1 top-0 left-[18%] w-px bg-white/35 shadow-[0_0_8px_rgba(255,255,255,0.16)]" />
                     </div>
                   </div>
                 )}
