@@ -1179,53 +1179,51 @@ function Studio() {
           ))}
           <div className="flex-1" />
           {activeTab === "workspace" && (
-            <button
-              onMouseDown={(e) => {
-                storyboardDragRef.current = true;
-                storyboardPressRef.current = { startY: e.clientY };
-                document.body.style.cursor = "row-resize";
-                document.body.style.userSelect = "none";
-              }}
-              onClick={() => {
-                if (storyboardSuppressClickRef.current) return;
-                setStoryboardHeight(storyboardCollapsed ? 112 : 10);
-              }}
-              className="absolute left-1 flex h-5 w-10 items-center justify-center rounded-[3px] border border-border bg-panel/95 text-[6px] font-medium lowercase leading-none text-muted-foreground shadow-lg ring-1 ring-white/5 transition-colors hover:border-primary/55 hover:text-foreground hover:shadow-[0_0_14px_rgba(255,255,255,0.12)]"
-              style={{ bottom: storyboardRailAnchor - 10 }}
-              title={storyboardCollapsed ? "Open storyboard" : "Drag to resize storyboard"}
-            >
-              storyboard
-            </button>
+            <>
+              <button
+                onMouseDown={(e) => {
+                  storyboardDragRef.current = true;
+                  storyboardPressRef.current = { startY: e.clientY };
+                  document.body.style.cursor = "row-resize";
+                  document.body.style.userSelect = "none";
+                }}
+                onClick={() => {
+                  if (storyboardSuppressClickRef.current) return;
+                  setStoryboardHeight(storyboardCollapsed ? 112 : 10);
+                }}
+                className="absolute left-1 flex h-5 w-9 items-center justify-center rounded-[3px] border border-white/10 bg-background/80 text-[5.5px] font-medium lowercase leading-none tracking-[0.01em] text-foreground/55 shadow-[0_7px_18px_rgba(0,0,0,0.28)] ring-1 ring-white/5 backdrop-blur transition-colors hover:border-primary/45 hover:text-foreground/90 hover:shadow-[0_0_16px_rgba(255,255,255,0.10)]"
+                style={{ bottom: storyboardRailAnchor - 10 }}
+                title={storyboardCollapsed ? "Open storyboard" : "Drag to resize storyboard"}
+              >
+                storyboard
+              </button>
+              <svg
+                aria-hidden="true"
+                className="pointer-events-none absolute left-[39px] h-3 w-2.5 overflow-visible text-primary/45"
+                style={{ bottom: storyboardRailAnchor - 6 }}
+                viewBox="0 0 10 12"
+              >
+                <path
+                  d="M 0 6 L 4 6 L 6 9 L 10 9"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1"
+                  strokeLinecap="square"
+                  strokeLinejoin="miter"
+                />
+                <path
+                  d="M 0 6 L 4 6 L 6 9 L 10 9"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="0.4"
+                  strokeLinecap="square"
+                  strokeLinejoin="miter"
+                  className="text-foreground/35"
+                />
+              </svg>
+            </>
           )}
         </aside>
-
-        {activeTab === "workspace" && (
-          <svg
-            aria-hidden="true"
-            className="pointer-events-none absolute left-8 z-20 h-5 w-4 overflow-visible"
-            style={{ bottom: storyboardRailAnchor - 10 }}
-            viewBox="0 0 16 20"
-          >
-            <path
-              d="M 0 6 L 7 6 L 11 12 L 16 12"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.25"
-              strokeLinecap="square"
-              strokeLinejoin="miter"
-              className="text-primary/55"
-            />
-            <path
-              d="M 0 6 L 7 6 L 11 12 L 16 12"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="0.5"
-              strokeLinecap="square"
-              strokeLinejoin="miter"
-              className="text-foreground/35"
-            />
-          </svg>
-        )}
 
         {/* Workspace / panels */}
         <main className="flex-1 flex flex-col min-w-0 bg-canvas overflow-hidden">
