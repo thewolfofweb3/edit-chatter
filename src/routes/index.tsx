@@ -208,8 +208,10 @@ function parseRequestedCount(text: string, fallback: number) {
     multiple: 4,
   };
   const digit = t.match(/\b(\d+)\s*(?:storyboard\s*)?(?:shots?|frames?|keyframes?|clips?|images?|assets?|scenes?)\b/);
+  const nearbyDigit = t.match(/\b(\d+)\s+(?=(?:\w+\s+){0,5}(?:shots?|frames?|keyframes?|clips?|images?|assets?|scenes?)\b)/);
   const word = t.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|couple|few|several|multiple)\s*(?:storyboard\s*)?(?:shots?|frames?|keyframes?|clips?|images?|assets?|scenes?)\b/);
-  const count = digit ? parseInt(digit[1], 10) : word ? wordNumbers[word[1]] : fallback;
+  const nearbyWord = t.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|couple|few|several|multiple)\s+(?=(?:\w+\s+){0,5}(?:shots?|frames?|keyframes?|clips?|images?|assets?|scenes?)\b)/);
+  const count = digit ? parseInt(digit[1], 10) : nearbyDigit ? parseInt(nearbyDigit[1], 10) : word ? wordNumbers[word[1]] : nearbyWord ? wordNumbers[nearbyWord[1]] : fallback;
   return Math.min(12, Math.max(1, count));
 }
 
@@ -230,6 +232,11 @@ function detectMockIntent(text: string): { kind: "video" | "keyframe" | "storybo
 }
 
 function detectRequestedPreset(text: string): number | null {
+  const presets = detectRequestedPresets(text);
+  return presets.length ? presets[presets.length - 1] : null;
+}
+
+function detectRequestedPresets(text: string): number[] {
   const t = text.toLowerCase();
   const matches: Array<{ index: number; preset: number }> = [];
   [
@@ -242,8 +249,10 @@ function detectRequestedPreset(text: string): number | null {
   ].forEach(({ preset, re }) => {
     for (const match of t.matchAll(re)) matches.push({ index: match.index ?? 0, preset });
   });
-  if (matches.length === 0) return null;
-  return matches.sort((a, b) => a.index - b.index)[matches.length - 1].preset;
+  return matches
+    .sort((a, b) => a.index - b.index)
+    .map((m) => m.preset)
+    .filter((preset, index, presets) => presets.indexOf(preset) === index);
 }
 
 function Studio() {
@@ -763,7 +772,7 @@ function Studio() {
     e.target.value = "";
   }
 
-  async function runMockWorkspaceAction(text: string, preset: Preset = selectedPreset) {
+  async function runMockWorkspaceAction(text: string, preset: Preset = selectedPreset, requestedPresetIdxs: number[] = []) {
     const intent = detectMockIntent(text);
     if (!intent) return false;
 
@@ -786,15 +795,18 @@ function Studio() {
     for (let i = 0; i < intent.count; i++) {
       setThinkingLabel(`Creating asset ${i + 1} of ${intent.count}`);
       await wait(350);
-      const url = makeMockImage(`${text}${intent.count > 1 ? ` - ${i + 1}` : ""}`, preset.w, preset.h);
+      const assetPreset = requestedPresetIdxs.length > 1
+        ? SIZE_PRESETS[requestedPresetIdxs[i % requestedPresetIdxs.length]]
+        : preset;
+      const url = makeMockImage(`${text}${intent.count > 1 ? ` - ${i + 1}` : ""}`, assetPreset.w, assetPreset.h);
       created.push(addAsset({
         name: intent.kind === "storyboard" ? `storyboard-shot-${i + 1}.png` : `mock-keyframe-${i + 1}.png`,
         kind: "image",
         url,
-        width: preset.w,
-        height: preset.h,
-        ratio: preset.ratio,
-        sizeLabel: preset.label,
+        width: assetPreset.w,
+        height: assetPreset.h,
+        ratio: assetPreset.ratio,
+        sizeLabel: assetPreset.label,
         styleSeed: `${text}${intent.count > 1 ? ` - ${i + 1}` : ""}`,
       }));
     }
@@ -820,7 +832,8 @@ function Studio() {
     const t = input.trim();
     if ((!t && pendingAttachments.length === 0) || isThinking) return;
 
-    const requestedPresetIdx = detectRequestedPreset(t);
+    const requestedPresetIdxs = detectRequestedPresets(t);
+    const requestedPresetIdx = requestedPresetIdxs.length ? requestedPresetIdxs[requestedPresetIdxs.length - 1] : null;
     const activePreset = requestedPresetIdx !== null ? SIZE_PRESETS[requestedPresetIdx] : selectedPreset;
     if (requestedPresetIdx !== null && requestedPresetIdx !== sizeIdx) setSizeIdx(requestedPresetIdx);
 
@@ -866,7 +879,7 @@ function Studio() {
       const handledCommand = await handleWorkspaceCommand(t, activePreset, requestedPresetIdx);
       if (handledCommand) return;
 
-      const handledMock = await runMockWorkspaceAction(t, activePreset);
+      const handledMock = await runMockWorkspaceAction(t, activePreset, requestedPresetIdxs);
       if (handledMock) return;
 
       const history = [...messages, { role: "user" as const, text: t }].map((m) => ({
@@ -1945,13 +1958,14 @@ function PanelAssets({
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {filtered.map((a) => {
                 const selected = selectedIds.includes(a.id);
+                const isWideAsset = (a.width ?? 16) >= (a.height ?? 9);
                 return (
                   <div key={a.id} className={`group grid h-72 grid-rows-[minmax(0,1fr)_52px] rounded-lg border bg-panel overflow-hidden transition-colors ${selected ? "border-primary/70" : "border-border hover:border-primary/60"}`}>
                     <div className="relative min-h-0 bg-black">
                       <button onClick={() => setViewerAssetId(a.id)} className="absolute inset-0 grid h-full w-full place-items-center p-5">
                         <div
                           className="relative max-h-full max-w-full overflow-hidden rounded-lg bg-black shadow-sm ring-1 ring-white/5"
-                          style={{ aspectRatio: a.ratio ?? "16 / 9", height: "100%" }}
+                          style={{ aspectRatio: a.ratio ?? "16 / 9", ...(isWideAsset ? { width: "100%" } : { height: "100%" }) }}
                         >
                           <img
                             src={a.kind === "video" ? (a.poster ?? "") : a.url}
