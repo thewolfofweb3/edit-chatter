@@ -202,9 +202,13 @@ function parseRequestedCount(text: string, fallback: number) {
     ten: 10,
     eleven: 11,
     twelve: 12,
+    couple: 2,
+    few: 3,
+    several: 4,
+    multiple: 4,
   };
   const digit = t.match(/\b(\d+)\s*(?:storyboard\s*)?(?:shots?|frames?|keyframes?|clips?|images?|assets?|scenes?)\b/);
-  const word = t.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(?:storyboard\s*)?(?:shots?|frames?|keyframes?|clips?|images?|assets?|scenes?)\b/);
+  const word = t.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|couple|few|several|multiple)\s*(?:storyboard\s*)?(?:shots?|frames?|keyframes?|clips?|images?|assets?|scenes?)\b/);
   const count = digit ? parseInt(digit[1], 10) : word ? wordNumbers[word[1]] : fallback;
   return Math.min(12, Math.max(1, count));
 }
@@ -212,11 +216,14 @@ function parseRequestedCount(text: string, fallback: number) {
 function detectMockIntent(text: string): { kind: "video" | "keyframe" | "storyboard"; count: number } | null {
   const t = text.toLowerCase();
   const mock = /mock|placeholder|fake|dummy/.test(t);
-  const wantVideo = /\bvideo|clip|reel|animation\b/.test(t);
-  const wantKey = /\bkey\s*frame|keyframe|shot|frame|image|asset\b/.test(t);
-  const wantBoard = /\bstoryboard|story\s*board|board\b/.test(t);
+  const wantsCreate = /\b(create|generate|make|build|render|produce|give me|add)\b/.test(t);
+  const wantVideo = /\b(videos?|clips?|reels?|animations?)\b/.test(t);
+  const wantKey = /\b(key\s*frames?|keyframes?|shots?|frames?|images?|pictures?|assets?)\b/.test(t);
+  const wantBoard = /\b(storyboard|story\s*board|board)\b/.test(t);
+  const wantsMultipleMedia = /\b(multiple|several|few|couple|\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/.test(t) && wantKey;
   if (!mock && !wantVideo && !wantKey && !wantBoard) return null;
-  const count = parseRequestedCount(t, wantBoard ? 4 : 1);
+  if (!mock && !wantsCreate && !wantBoard && !wantsMultipleMedia) return null;
+  const count = parseRequestedCount(t, wantBoard ? 4 : wantsMultipleMedia ? 4 : 1);
   if (wantVideo && !wantKey && !wantBoard) return { kind: "video", count: 1 };
   if (wantBoard) return { kind: "storyboard", count };
   return { kind: "keyframe", count };
