@@ -295,6 +295,8 @@ function Studio() {
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const assetUploadRef = useRef<HTMLInputElement>(null);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
+  const inventoryRef = useRef<HTMLDivElement>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const plusRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"video" | "photo">("photo");
@@ -338,6 +340,15 @@ function Studio() {
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [plusOpen]);
+
+  useEffect(() => {
+    if (!inventoryOpen) return;
+    function onDown(e: MouseEvent) {
+      if (inventoryRef.current && !inventoryRef.current.contains(e.target as Node)) setInventoryOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [inventoryOpen]);
 
   useEffect(() => {
     if (!shotPickerOpen) return;
@@ -768,6 +779,13 @@ function Studio() {
   function cuePreviewRefine() {
     if (!hasPreviewOutput) return;
     setInput("Refine the current preview output. Keep the strongest parts, improve the weak parts, and preserve the same composition.");
+    setActiveTab("workspace");
+    setTimeout(() => composerRef.current?.focus(), 0);
+  }
+  function cueInventoryPrompt(prompt: string) {
+    setInput(prompt);
+    setPanelView("chat");
+    setInventoryOpen(false);
     setActiveTab("workspace");
     setTimeout(() => composerRef.current?.focus(), 0);
   }
@@ -2171,6 +2189,81 @@ function Studio() {
               )}
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
+              {panelView === "chat" && (
+                <div className="relative" ref={inventoryRef}>
+                  <button
+                    onClick={() => setInventoryOpen((v) => !v)}
+                    title="AI Inventory"
+                    className={`h-8 w-8 grid place-items-center rounded-md ${
+                      inventoryOpen ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    }`}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </button>
+                  {inventoryOpen && (
+                    <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-lg border border-border bg-popover shadow-xl">
+                      <div className="border-b border-border px-3 py-2">
+                        <div className="text-sm font-medium text-foreground">AI Inventory</div>
+                        <div className="text-[11px] text-muted-foreground">Commands the assistant can use in this workspace.</div>
+                      </div>
+                      <div className="max-h-[360px] overflow-y-auto p-1.5">
+                        {[
+                          {
+                            icon: Library,
+                            title: "Generate Asset Batch",
+                            detail: "Create multiple image assets and send them to Recents.",
+                            prompt: "Generate 6 cinematic image assets in landscape dimensions for this project.",
+                          },
+                          {
+                            icon: LayoutGrid,
+                            title: "Build Storyboard",
+                            detail: "Create storyboard inputs and place them on the storyboard rail.",
+                            prompt: "Generate 6 storyboard shots for this video idea and add them to the storyboard.",
+                          },
+                          {
+                            icon: Wand2,
+                            title: "Refine Preview",
+                            detail: "Use the current preview as the output to improve.",
+                            prompt: "Refine the current preview output. Keep the strongest parts, improve the weak parts, and preserve the same composition.",
+                          },
+                          {
+                            icon: Target,
+                            title: "Use Marked Region",
+                            detail: "Edit only the highlighted or brushed area.",
+                            prompt: "Use my marked region as the edit target and blend the change naturally into the rest of the image.",
+                          },
+                          {
+                            icon: Film,
+                            title: "Create Motion Preview",
+                            detail: "Render a short mock video output.",
+                            prompt: "Generate a short cinematic mock video preview for this idea.",
+                          },
+                          {
+                            icon: Trash2,
+                            title: "Clean Workspace",
+                            detail: "Clear preview or storyboard by command.",
+                            prompt: "Clear the preview output but keep my assets and storyboard safe.",
+                          },
+                        ].map(({ icon: Icon, title, detail, prompt }) => (
+                          <button
+                            key={title}
+                            onClick={() => cueInventoryPrompt(prompt)}
+                            className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent"
+                          >
+                            <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md border border-white/10 bg-black/20 text-primary">
+                              <Icon className="h-3.5 w-3.5" />
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-xs font-medium text-foreground">{title}</span>
+                              <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">{detail}</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <button onClick={newChat} title="New chat" className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent">
                 <MessageSquarePlus className="h-4 w-4" />
               </button>
