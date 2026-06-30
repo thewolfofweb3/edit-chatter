@@ -22,7 +22,19 @@ export const Route = createFileRoute("/")({
 });
 
 type Attachment = { id: number; name: string; type: string; url?: string };
-type Msg = { id: number; role: "user" | "ai"; text: string; attachments?: Attachment[] };
+type InventoryAction =
+  | { label: string; action: "open-assets" }
+  | { label: string; action: "add-assets-to-storyboard"; assetIds: number[] }
+  | { label: string; action: "prompt"; prompt: string };
+type InventoryCard = {
+  id: string;
+  kind: "asset-batch" | "storyboard-batch" | "workspace-action";
+  title: string;
+  subtitle?: string;
+  stats?: { label: string; value: string }[];
+  actions?: InventoryAction[];
+};
+type Msg = { id: number; role: "user" | "ai"; text: string; attachments?: Attachment[]; cards?: InventoryCard[] };
 type Chat = { id: number; name: string; messages: Msg[]; updatedAt: number };
 type Sel = { x: number; y: number; w: number; h: number };
 type Tool = "move" | "select" | "brush";
@@ -677,14 +689,14 @@ function Studio() {
     setChats((cs) => cs.map((c) => (c.id === id ? updater(c) : c)));
   }
 
-  function pushMessage(role: "user" | "ai", text: string, attachments?: Attachment[], options?: { typing?: "normal" | "deliberate" }) {
+  function pushMessage(role: "user" | "ai", text: string, attachments?: Attachment[], options?: { typing?: "normal" | "deliberate"; cards?: InventoryCard[] }) {
     const id = Date.now() + Math.floor(Math.random() * 1000);
     const chatId = currentChatId;
     if (role === "ai" && text) {
       updateChat(chatId, (c) => ({
         ...c,
         updatedAt: Date.now(),
-        messages: [...c.messages, { id, role, text: "", attachments }],
+        messages: [...c.messages, { id, role, text: "", attachments, cards: options?.cards }],
       }));
       let cursor = 0;
       const deliberate = options?.typing === "deliberate";
@@ -707,7 +719,7 @@ function Studio() {
     updateChat(currentChatId, (c) => ({
       ...c,
       updatedAt: Date.now(),
-      messages: [...c.messages, { id, role, text, attachments }],
+      messages: [...c.messages, { id, role, text, attachments, cards: options?.cards }],
     }));
     return id;
   }
@@ -758,6 +770,24 @@ function Studio() {
     setInput("Refine the current preview output. Keep the strongest parts, improve the weak parts, and preserve the same composition.");
     setActiveTab("workspace");
     setTimeout(() => composerRef.current?.focus(), 0);
+  }
+  function runInventoryAction(action: InventoryAction) {
+    if (action.action === "open-assets") {
+      setActiveTab("assets");
+      return;
+    }
+    if (action.action === "prompt") {
+      setInput(action.prompt);
+      setActiveTab("workspace");
+      setTimeout(() => composerRef.current?.focus(), 0);
+      return;
+    }
+    if (action.action === "add-assets-to-storyboard") {
+      const selected = action.assetIds
+        .map((id) => assets.find((asset) => asset.id === id))
+        .filter((asset): asset is Asset => !!asset);
+      moveAssetsToStoryboard(selected);
+    }
   }
   function clearPreview() {
     setPreviewAssetId(null);
@@ -975,7 +1005,22 @@ function Studio() {
       const video = await makeMockVideo(text);
       const asset = addAsset({ name: "mock-video.webm", kind: "video", url: video.url, poster: video.poster, width: 1280, height: 720, ratio: "16 / 9", sizeLabel: "Landscape · 1280×720" });
       selectPreviewAsset(asset);
-      pushMessage("ai", "Mock video created and saved to Assets.");
+      pushMessage("ai", "", undefined, {
+        cards: [{
+          id: `inventory-video-${asset.id}`,
+          kind: "asset-batch",
+          title: "Video output created",
+          subtitle: "Saved to Assets and opened in Preview.",
+          stats: [
+            { label: "Type", value: "Video" },
+            { label: "Size", value: asset.sizeLabel ?? "Landscape" },
+          ],
+          actions: [
+            { label: "Open Assets", action: "open-assets" },
+            { label: "Refine", action: "prompt", prompt: "Refine the current video output. Keep the strongest parts and improve the weak parts." },
+          ],
+        }],
+      });
       return true;
     }
 
@@ -1007,11 +1052,47 @@ function Studio() {
       setShots(nextShots);
       setSelectedShotId(nextShots[0]?.id ?? null);
       clearPreview();
-      pushMessage("ai", `Storyboard created with ${created.length} shot${created.length === 1 ? "" : "s"}.`);
+      const uniqueSizes = Array.from(new Set(created.map((asset) => asset.sizeLabel ?? "asset")));
+      pushMessage("ai", "", undefined, {
+        cards: [{
+          id: `inventory-storyboard-${Date.now()}`,
+          kind: "storyboard-batch",
+          title: `${created.length} storyboard shot${created.length === 1 ? "" : "s"} created`,
+          subtitle: "Added to the storyboard input rail and saved to Assets.",
+          stats: [
+            { label: "Shots", value: String(created.length) },
+            { label: "Sizing", value: uniqueSizes.length === 1 ? uniqueSizes[0] : `${uniqueSizes.length} sizes` },
+            { label: "Destination", value: "Storyboard" },
+            { label: "Inventory", value: "Assets" },
+          ],
+          actions: [
+            { label: "Open Assets", action: "open-assets" },
+            { label: "Refine Prompt", action: "prompt", prompt: "Refine this storyboard batch with stronger cinematic composition and more consistent style." },
+          ],
+        }],
+      });
     } else {
       if (created[0]) selectPreviewAsset(created[0]);
-      const sizeSummary = created.map((asset) => asset.sizeLabel ?? "asset").join(", ");
-      pushMessage("ai", `${created.length} mock keyframe${created.length === 1 ? "" : "s"} saved to Assets: ${sizeSummary}.`);
+      const uniqueSizes = Array.from(new Set(created.map((asset) => asset.sizeLabel ?? "asset")));
+      pushMessage("ai", "", undefined, {
+        cards: [{
+          id: `inventory-assets-${Date.now()}`,
+          kind: "asset-batch",
+          title: `${created.length} asset${created.length === 1 ? "" : "s"} created`,
+          subtitle: "Saved to Assets and added to Recents for quick preview switching.",
+          stats: [
+            { label: "Assets", value: String(created.length) },
+            { label: "Sizing", value: uniqueSizes.length === 1 ? uniqueSizes[0] : `${uniqueSizes.length} sizes` },
+            { label: "Preview", value: created[0]?.name ?? "Latest asset" },
+            { label: "Inventory", value: "Assets + Recents" },
+          ],
+          actions: [
+            { label: "Open Assets", action: "open-assets" },
+            { label: "Add to Storyboard", action: "add-assets-to-storyboard", assetIds: created.map((asset) => asset.id) },
+            { label: "Refine Prompt", action: "prompt", prompt: "Refine these generated assets with stronger style consistency and better cinematic composition." },
+          ],
+        }],
+      });
     }
     return true;
   }
@@ -2103,7 +2184,7 @@ function Studio() {
               )}
               {[...chats].sort((a, b) => b.updatedAt - a.updatedAt).map((c) => {
                 const last = c.messages[c.messages.length - 1];
-                const preview = last?.text || (last?.attachments?.length ? `📎 ${last.attachments[0].name}` : "");
+                const preview = last?.text || last?.cards?.[0]?.title || (last?.attachments?.length ? `Attachment: ${last.attachments[0].name}` : "");
                 const active = c.id === currentChatId;
                 return (
                   <div
@@ -2156,8 +2237,11 @@ function Studio() {
                       )}
                       {m.text && (
                         m.role === "ai"
-                          ? <AssistantMessage text={m.text} />
+                          ? <AssistantMessage text={m.text} cards={m.cards} onAction={runInventoryAction} />
                           : <div className="whitespace-pre-wrap">{m.text}</div>
+                      )}
+                      {!m.text && m.role === "ai" && m.cards && m.cards.length > 0 && (
+                        <AssistantMessage text="" cards={m.cards} onAction={runInventoryAction} />
                       )}
                     </div>
                   </div>
@@ -2317,7 +2401,15 @@ function PanelHeader({ title, subtitle, children }: { title: string; subtitle?: 
   );
 }
 
-function AssistantMessage({ text }: { text: string }) {
+function AssistantMessage({
+  text,
+  cards = [],
+  onAction,
+}: {
+  text: string;
+  cards?: InventoryCard[];
+  onAction?: (action: InventoryAction) => void;
+}) {
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
 
   return (
@@ -2361,6 +2453,51 @@ function AssistantMessage({ text }: { text: string }) {
           </p>
         );
       })}
+      {cards.map((card) => (
+        <AssistantInventoryCard key={card.id} card={card} onAction={onAction} />
+      ))}
+    </div>
+  );
+}
+
+function AssistantInventoryCard({ card, onAction }: { card: InventoryCard; onAction?: (action: InventoryAction) => void }) {
+  const Icon = card.kind === "asset-batch" ? Library : card.kind === "storyboard-batch" ? LayoutGrid : Sparkles;
+
+  return (
+    <div className="mt-2 overflow-hidden rounded-lg border border-white/10 bg-background/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="flex items-start gap-2 border-b border-white/10 px-2.5 py-2">
+        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-white/10 bg-black/25 text-primary">
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-foreground">{card.title}</div>
+          {card.subtitle && <div className="mt-0.5 text-xs text-muted-foreground">{card.subtitle}</div>}
+        </div>
+      </div>
+      {card.stats && card.stats.length > 0 && (
+        <div className="grid grid-cols-2 gap-1.5 p-2">
+          {card.stats.map((stat) => (
+            <div key={`${card.id}-${stat.label}`} className="rounded-md border border-white/10 bg-black/20 px-2 py-1.5">
+              <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">{stat.label}</div>
+              <div className="mt-0.5 truncate text-xs font-medium text-foreground">{stat.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {card.actions && card.actions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 border-t border-white/10 px-2 py-2">
+          {card.actions.map((action) => (
+            <button
+              key={`${card.id}-${action.label}`}
+              onClick={() => onAction?.(action)}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-white/10 bg-black/20 px-2 text-xs text-muted-foreground transition-colors hover:text-foreground hover:border-white/25"
+            >
+              {action.action === "open-assets" ? <Library className="h-3 w-3" /> : action.action === "add-assets-to-storyboard" ? <LayoutGrid className="h-3 w-3" /> : <Wand2 className="h-3 w-3" />}
+              {action.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2740,3 +2877,4 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     </div>
   );
 }
+
