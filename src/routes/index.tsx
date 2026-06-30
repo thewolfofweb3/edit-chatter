@@ -644,7 +644,9 @@ function Studio() {
     ...recentAssets,
     ...assets.filter((asset) => !recentAssetIds.includes(asset.id)),
   ].slice(0, 6);
-  const recentsRailVisible = outputTakes.length > 0 && previewAreaSize.w >= 1280;
+  const recentsVisible = outputTakes.length > 0;
+  const recentsRailVisible = recentsVisible && previewAreaSize.w >= 760;
+  const recentsStripVisible = recentsVisible && !recentsRailVisible;
   const recentsRailWidth = recentsRailVisible ? 80 : 0;
   const previewRatio = outputPreset.w / outputPreset.h;
   const previewMaxWidth = Math.max(260, Math.min(1152, previewAreaSize.w - 48 - recentsRailWidth));
@@ -1579,6 +1581,41 @@ function Studio() {
                   </div>
                 )}
                 </div>
+
+                {recentsStripVisible && (
+                  <div className="flex h-14 max-w-full items-center gap-1.5 overflow-hidden rounded-lg border border-white/10 bg-panel/85 p-1.5 shadow-lg backdrop-blur">
+                    <div className="shrink-0 px-1 text-[8.5px] uppercase tracking-[0.08em] text-muted-foreground/70">recents</div>
+                    <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
+                      {outputTakes.map((take, index) => {
+                        const active = previewAssetId === take.id;
+                        return (
+                          <button
+                            key={take.id}
+                            onClick={() => selectPreviewAsset(take)}
+                            className={`group relative h-10 w-14 shrink-0 overflow-hidden rounded-md border bg-black transition-colors ${
+                              active ? "border-primary ring-2 ring-primary/25" : "border-white/10 hover:border-white/35"
+                            }`}
+                            title={`Recent ${index + 1}: ${take.name}`}
+                          >
+                            <img
+                              src={take.kind === "video" ? (take.poster ?? "") : take.url}
+                              alt=""
+                              className="absolute inset-0 h-full w-full object-cover opacity-85 transition-opacity group-hover:opacity-100"
+                            />
+                            {take.kind === "video" && (
+                              <div className="absolute inset-0 grid place-items-center bg-black/20">
+                                <Play className="h-3 w-3 text-white drop-shadow" />
+                              </div>
+                            )}
+                            <div className="absolute bottom-0 left-0 rounded-tr bg-black/70 px-1 py-0.5 text-[8px] leading-none text-white/75">
+                              {index + 1}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="relative flex h-10 max-w-full items-center gap-2 rounded-lg border border-border bg-panel/80 px-2 shadow-lg backdrop-blur" ref={sizeMenuRef}>
                   <button
