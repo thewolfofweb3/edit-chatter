@@ -636,8 +636,11 @@ function Studio() {
 
   const previewWidth = Math.max(0, shellWidth - 48 - 4 - chatWidth);
   const previewCollapsed = shellWidth > 0 && previewWidth < 240;
+  const outputTakes = assets.slice(0, 6);
+  const recentsRailVisible = outputTakes.length > 0 && previewAreaSize.w >= 1280;
+  const recentsRailWidth = recentsRailVisible ? 80 : 0;
   const previewRatio = outputPreset.w / outputPreset.h;
-  const previewMaxWidth = Math.max(260, Math.min(1152, previewAreaSize.w - 48));
+  const previewMaxWidth = Math.max(260, Math.min(1152, previewAreaSize.w - 48 - recentsRailWidth));
   const previewMaxHeight = Math.max(220, previewAreaSize.h - 98);
   const previewFrame =
     previewMaxWidth / previewMaxHeight > previewRatio
@@ -649,7 +652,6 @@ function Studio() {
   const previewVideoDuration = showVideo ? "00:03" : "00:00";
   const renderSeed = previewAsset ? String(previewAsset.createdAt).slice(-5) : "-----";
   const outputStatus = hasPreviewOutput ? (showVideo ? "video ready" : "image ready") : "empty";
-  const outputTakes = assets.slice(0, 6);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -1433,41 +1435,7 @@ function Studio() {
                   ))}
                 </div>
 
-                {outputTakes.length > 0 && (
-                  <div className="absolute right-4 top-4 z-10 hidden max-h-[calc(100%-7rem)] w-16 flex-col gap-1.5 overflow-hidden rounded-lg border border-white/10 bg-panel/85 p-1.5 shadow-lg backdrop-blur xl:flex">
-                    <div className="px-1 text-[9px] uppercase tracking-[0.12em] text-muted-foreground/70">takes</div>
-                    <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-0.5">
-                      {outputTakes.map((take, index) => {
-                        const active = previewAssetId === take.id;
-                        return (
-                          <button
-                            key={take.id}
-                            onClick={() => selectPreviewAsset(take)}
-                            className={`group relative h-10 overflow-hidden rounded-md border bg-black transition-colors ${
-                              active ? "border-primary ring-2 ring-primary/25" : "border-white/10 hover:border-white/35"
-                            }`}
-                            title={`Take ${index + 1}: ${take.name}`}
-                          >
-                            <img
-                              src={take.kind === "video" ? (take.poster ?? "") : take.url}
-                              alt=""
-                              className="absolute inset-0 h-full w-full object-cover opacity-85 transition-opacity group-hover:opacity-100"
-                            />
-                            {take.kind === "video" && (
-                              <div className="absolute inset-0 grid place-items-center bg-black/20">
-                                <Play className="h-3 w-3 text-white drop-shadow" />
-                              </div>
-                            )}
-                            <div className="absolute bottom-0 left-0 rounded-tr bg-black/70 px-1 py-0.5 text-[8px] leading-none text-white/75">
-                              {index + 1}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
+                <div className="flex max-w-full items-center justify-center gap-3">
                 <div
                   ref={canvasRef}
                   onMouseDown={onCanvasDown}
@@ -1565,6 +1533,42 @@ function Studio() {
                       )}
                     </svg>
                   )}
+                </div>
+
+                {recentsRailVisible && (
+                  <div className="flex max-h-[min(420px,calc(100vh-18rem))] w-16 shrink-0 flex-col gap-1.5 overflow-hidden rounded-lg border border-white/10 bg-panel/85 p-1.5 shadow-lg backdrop-blur">
+                    <div className="px-1 text-[8.5px] uppercase tracking-[0.08em] text-muted-foreground/70">recents</div>
+                    <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-0.5">
+                      {outputTakes.map((take, index) => {
+                        const active = previewAssetId === take.id;
+                        return (
+                          <button
+                            key={take.id}
+                            onClick={() => selectPreviewAsset(take)}
+                            className={`group relative h-10 overflow-hidden rounded-md border bg-black transition-colors ${
+                              active ? "border-primary ring-2 ring-primary/25" : "border-white/10 hover:border-white/35"
+                            }`}
+                            title={`Recent ${index + 1}: ${take.name}`}
+                          >
+                            <img
+                              src={take.kind === "video" ? (take.poster ?? "") : take.url}
+                              alt=""
+                              className="absolute inset-0 h-full w-full object-cover opacity-85 transition-opacity group-hover:opacity-100"
+                            />
+                            {take.kind === "video" && (
+                              <div className="absolute inset-0 grid place-items-center bg-black/20">
+                                <Play className="h-3 w-3 text-white drop-shadow" />
+                              </div>
+                            )}
+                            <div className="absolute bottom-0 left-0 rounded-tr bg-black/70 px-1 py-0.5 text-[8px] leading-none text-white/75">
+                              {index + 1}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 </div>
 
                 <div className="relative flex h-10 max-w-full items-center gap-2 rounded-lg border border-border bg-panel/80 px-2 shadow-lg backdrop-blur" ref={sizeMenuRef}>
