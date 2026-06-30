@@ -649,6 +649,7 @@ function Studio() {
   const previewVideoDuration = showVideo ? "00:03" : "00:00";
   const renderSeed = previewAsset ? String(previewAsset.createdAt).slice(-5) : "-----";
   const outputStatus = hasPreviewOutput ? (showVideo ? "video ready" : "image ready") : "empty";
+  const outputTakes = assets.slice(0, 6);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -1431,6 +1432,41 @@ function Studio() {
                     </button>
                   ))}
                 </div>
+
+                {outputTakes.length > 0 && (
+                  <div className="absolute right-4 top-4 z-10 hidden max-h-[calc(100%-7rem)] w-16 flex-col gap-1.5 overflow-hidden rounded-lg border border-white/10 bg-panel/85 p-1.5 shadow-lg backdrop-blur xl:flex">
+                    <div className="px-1 text-[9px] uppercase tracking-[0.12em] text-muted-foreground/70">takes</div>
+                    <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-0.5">
+                      {outputTakes.map((take, index) => {
+                        const active = previewAssetId === take.id;
+                        return (
+                          <button
+                            key={take.id}
+                            onClick={() => selectPreviewAsset(take)}
+                            className={`group relative h-10 overflow-hidden rounded-md border bg-black transition-colors ${
+                              active ? "border-primary ring-2 ring-primary/25" : "border-white/10 hover:border-white/35"
+                            }`}
+                            title={`Take ${index + 1}: ${take.name}`}
+                          >
+                            <img
+                              src={take.kind === "video" ? (take.poster ?? "") : take.url}
+                              alt=""
+                              className="absolute inset-0 h-full w-full object-cover opacity-85 transition-opacity group-hover:opacity-100"
+                            />
+                            {take.kind === "video" && (
+                              <div className="absolute inset-0 grid place-items-center bg-black/20">
+                                <Play className="h-3 w-3 text-white drop-shadow" />
+                              </div>
+                            )}
+                            <div className="absolute bottom-0 left-0 rounded-tr bg-black/70 px-1 py-0.5 text-[8px] leading-none text-white/75">
+                              {index + 1}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div
                   ref={canvasRef}
