@@ -291,6 +291,7 @@ function Studio() {
 
   // Asset library + storyboard + selected preview
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [recentAssetIds, setRecentAssetIds] = useState<number[]>([]);
   const [shots, setShots] = useState<Shot[]>([]);
   const [previewAssetId, setPreviewAssetId] = useState<number | null>(null);
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
@@ -636,7 +637,13 @@ function Studio() {
 
   const previewWidth = Math.max(0, shellWidth - 48 - 4 - chatWidth);
   const previewCollapsed = shellWidth > 0 && previewWidth < 240;
-  const outputTakes = assets.slice(0, 6);
+  const recentAssets = recentAssetIds
+    .map((id) => assets.find((asset) => asset.id === id))
+    .filter((asset): asset is Asset => !!asset);
+  const outputTakes = [
+    ...recentAssets,
+    ...assets.filter((asset) => !recentAssetIds.includes(asset.id)),
+  ].slice(0, 6);
   const recentsRailVisible = outputTakes.length > 0 && previewAreaSize.w >= 1280;
   const recentsRailWidth = recentsRailVisible ? 80 : 0;
   const previewRatio = outputPreset.w / outputPreset.h;
@@ -707,6 +714,7 @@ function Studio() {
   function addAsset(a: Omit<Asset, "id" | "createdAt">): Asset {
     const asset: Asset = { ...a, id: Date.now() + Math.floor(Math.random() * 1000), createdAt: Date.now() };
     setAssets((xs) => [asset, ...xs]);
+    setRecentAssetIds((ids) => [asset.id, ...ids.filter((id) => id !== asset.id)].slice(0, 6));
     return asset;
   }
   function updateAssetDimensions(asset: Asset) {
@@ -796,6 +804,7 @@ function Studio() {
   }
   function deleteAssetById(id: number) {
     setAssets((xs) => xs.filter((a) => a.id !== id));
+    setRecentAssetIds((ids) => ids.filter((assetId) => assetId !== id));
     setShots((xs) => xs.filter((s) => s.assetId !== id));
     if (previewAssetId === id) clearPreview();
   }
