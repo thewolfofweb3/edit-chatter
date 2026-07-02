@@ -243,13 +243,14 @@ function parseRequestedCount(text: string, fallback: number) {
 function detectMockIntent(text: string, requestedPresetCount = 0): { kind: "video" | "keyframe" | "storyboard"; count: number } | null {
   const t = text.toLowerCase();
   const mock = /mock|placeholder|fake|dummy/.test(t);
+  if (!mock) return null;
   const wantsCreate = /\b(create|generate|make|build|render|produce|give me|add)\b/.test(t);
   const wantVideo = /\b(videos?|clips?|reels?|animations?)\b/.test(t);
   const wantKey = /\b(key\s*frames?|keyframes?|shots?|frames?|images?|pictures?|assets?)\b/.test(t);
   const wantBoard = /\b(storyboard|story\s*board|board)\b/.test(t);
   const wantsMultipleMedia = /\b(multiple|several|few|couple|\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/.test(t) && wantKey;
-  if (!mock && !wantVideo && !wantKey && !wantBoard) return null;
-  if (!mock && !wantsCreate && !wantBoard && !wantsMultipleMedia) return null;
+  if (!wantVideo && !wantKey && !wantBoard) return null;
+  if (!wantsCreate && !wantBoard && !wantsMultipleMedia) return null;
   const fallbackCount = wantBoard ? 4 : requestedPresetCount > 1 ? requestedPresetCount : wantsMultipleMedia ? 4 : 1;
   const count = parseRequestedCount(t, fallbackCount);
   if (wantVideo && !wantKey && !wantBoard) return { kind: "video", count: 1 };
