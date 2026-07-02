@@ -20,6 +20,13 @@ function openAiImageSize(size?: ImageRequest["size"]): "1024x1024" | "1024x1536"
   return "1024x1024";
 }
 
+function configuredImageModel() {
+  const model = (process.env.OPENAI_IMAGE_MODEL || "gpt-image-1").trim();
+  // Keep older .env files working. We originally suggested gpt-image-2, but
+  // gpt-image-1 is the safer Images API model for this workflow right now.
+  return model === "gpt-image-2" ? "gpt-image-1" : model;
+}
+
 function animationPrompt(prompt: string, size?: ImageRequest["size"]) {
   return [
     "Reel Studio visual identity: animation-first, digital-film production art. Default to stylized animation, anime/cinematic animation, cel-shaded illustration, graphic novel, motion-design, or polished game-cinematic concept art.",
@@ -91,7 +98,7 @@ export const Route = createFileRoute("/api/image")({
 
         const size = openAiImageSize(body.size);
         const prompt = animationPrompt(body.prompt, body.size);
-        const imageModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
+        const imageModel = configuredImageModel();
 
         if (body.mode === "edit" && body.imageBase64) {
           const form = new FormData();
@@ -99,7 +106,6 @@ export const Route = createFileRoute("/api/image")({
           form.set("prompt", editPrompt(body.prompt, body.size, body.sourceKind));
           form.set("size", size);
           form.set("quality", process.env.OPENAI_IMAGE_QUALITY || "high");
-          form.set("output_format", "png");
           form.set("image", base64ToFile(body.imageBase64, "source.png"));
           if (body.maskBase64) {
             form.set("mask", base64ToFile(body.maskBase64, "mask.png"));
