@@ -372,8 +372,7 @@ function Studio() {
   const [chatWidth, setChatWidth] = useState(380);
   const [railOrder, setRailOrder] = useState<WorkspaceRail[]>(["storyboard"]);
   const [storyboardHeight, setStoryboardHeight] = useState(STORYBOARD_OPEN);
-  const [audioMuted, setAudioMuted] = useState(false);
-  const [renderMode, setRenderMode] = useState<"draft" | "final">("draft");
+  const [previewMuted, setPreviewMuted] = useState(false);
   const [shellWidth, setShellWidth] = useState(0);
   const [tool, setTool] = useState<Tool>("select");
   const [sizeIdx, setSizeIdx] = useState(0);
@@ -612,8 +611,6 @@ function Studio() {
   const activePageLabel = activeTab === "workspace"
     ? "Workspace"
     : activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
-  const previewVideoDuration = showVideo ? "00:03" : "00:00";
-  const renderSeed = previewAsset ? String(previewAsset.createdAt).slice(-5) : "-----";
   const outputStatus = hasPreviewOutput ? (showVideo ? "video ready" : "image ready") : "empty";
   const latestRenderJob = renderJobs[0] ?? null;
 
@@ -1664,6 +1661,7 @@ function Studio() {
                       ref={videoRef}
                       src={previewAsset.url}
                       poster={previewAsset.poster}
+                      muted={previewMuted}
                       onPlay={() => setIsPreviewPlaying(true)}
                       onPause={() => setIsPreviewPlaying(false)}
                       onEnded={() => setIsPreviewPlaying(false)}
@@ -1858,39 +1856,25 @@ function Studio() {
                   )}
                   <div className="hidden h-5 w-px bg-border sm:block" />
                   <button
-                    onClick={() => setAudioMuted((v) => !v)}
-                    className={`grid h-7 w-7 place-items-center rounded-md border border-white/10 bg-black/20 transition-colors ${
-                      audioMuted ? "text-muted-foreground hover:text-foreground" : "text-foreground hover:bg-white/[0.06]"
+                    onClick={() => setPreviewMuted((v) => !v)}
+                    className={`flex h-8 items-center gap-1.5 rounded-md border border-white/10 bg-black/20 px-2 text-xs transition-colors ${
+                      previewMuted ? "text-muted-foreground hover:text-foreground" : "text-foreground hover:bg-white/[0.06]"
                     }`}
-                    title={audioMuted ? "Unmute music" : "Mute music"}
+                    title={previewMuted ? "Unmute preview" : "Mute preview"}
                   >
-                    {audioMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                    {previewMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                    <span className="hidden sm:inline">{previewMuted ? "Muted" : "Sound"}</span>
                   </button>
                   <div className="hidden h-7 items-center gap-1.5 rounded-md border border-white/10 bg-black/25 px-2 text-[11px] text-muted-foreground sm:flex">
                     <span className={`h-1.5 w-1.5 rounded-full ${hasPreviewOutput ? "bg-emerald-300" : "bg-muted-foreground/35"}`} />
                     <span className="whitespace-nowrap">{outputStatus}</span>
                   </div>
-                  <div className="hidden h-7 overflow-hidden rounded-md border border-white/10 bg-black/20 p-0.5 md:flex">
-                    {(["draft", "final"] as const).map((mode) => (
-                      <button
-                        key={mode}
-                        onClick={() => setRenderMode(mode)}
-                        className={`h-6 rounded px-2 text-[11px] capitalize transition-colors ${
-                          renderMode === mode ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {mode}
-                      </button>
-                    ))}
-                  </div>
-                  {showVideo && (
-                  <div className="hidden h-7 items-center gap-1.5 rounded-md border border-white/10 bg-black/20 px-2 text-[11px] text-muted-foreground lg:flex">
-                    <Target className="h-3 w-3 text-foreground/60" />
-                    <span>{previewVideoDuration}</span>
-                  </div>
-                  )}
-                  <div className="hidden h-7 items-center rounded-md border border-white/10 bg-black/20 px-2 text-[11px] text-muted-foreground lg:flex">
-                    seed {renderSeed}
+                  <div className="hidden h-7 min-w-0 max-w-[220px] items-center gap-1.5 rounded-md border border-white/10 bg-black/20 px-2 text-[11px] text-muted-foreground lg:flex">
+                    <Clock3 className="h-3.5 w-3.5 text-emerald-200/80" />
+                    <span className={`h-1.5 w-1.5 rounded-full ${latestRenderJob?.status === "running" ? "bg-primary animate-pulse" : latestRenderJob ? "bg-emerald-300" : "bg-muted-foreground/35"}`} />
+                    <span className="truncate">
+                      {latestRenderJob ? latestRenderJob.detail : "idle"}
+                    </span>
                   </div>
                   <button
                     onClick={cuePreviewRefine}
@@ -1900,30 +1884,6 @@ function Studio() {
                   >
                     <Wand2 className="h-3.5 w-3.5" />
                   </button>
-                </div>
-                <div className="flex h-8 max-w-full items-center gap-2 rounded-lg border border-white/10 bg-panel/75 px-2 text-[11px] text-muted-foreground shadow-lg backdrop-blur">
-                  <span className="inline-flex items-center gap-1.5 text-foreground/80">
-                    <Clock3 className="h-3.5 w-3.5 text-emerald-200/80" />
-                    Queue
-                  </span>
-                  <span className={`h-1.5 w-1.5 rounded-full ${latestRenderJob?.status === "running" ? "bg-primary animate-pulse" : latestRenderJob ? "bg-emerald-300" : "bg-muted-foreground/35"}`} />
-                  <span className="max-w-[34vw] truncate">
-                    {latestRenderJob ? `${latestRenderJob.label}: ${latestRenderJob.detail}` : "idle"}
-                  </span>
-                  {renderJobs.length > 1 && (
-                    <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      +{renderJobs.length - 1}
-                    </span>
-                  )}
-                  {renderJobs.length > 0 && (
-                    <button
-                      onClick={() => setRenderJobs([])}
-                      className="ml-auto grid h-5 w-5 place-items-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      title="Clear queue"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
                 </div>
                 </>
                 )}
