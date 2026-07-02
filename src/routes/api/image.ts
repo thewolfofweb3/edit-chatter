@@ -22,9 +22,15 @@ type ImageRequest = {
 };
 
 type EditCandidate = {
-  b64: string;
+  dataUrl: string;
   revisedPrompt?: string;
   attempt: number;
+};
+
+type OpenAIImageResult = {
+  b64_json?: string;
+  url?: string;
+  revised_prompt?: string;
 };
 
 function openAiImageSize(size?: ImageRequest["size"]): "1024x1024" | "1024x1536" | "1536x1024" | "auto" {
@@ -50,6 +56,32 @@ function editCandidateCount() {
 
 function dataUrlFromBase64(b64: string) {
   return `data:image/png;base64,${b64}`;
+}
+
+function previewJson(value: unknown) {
+  try {
+    return JSON.stringify(value).slice(0, 900);
+  } catch {
+    return String(value).slice(0, 900);
+  }
+}
+
+async function imageResultToDataUrl(result?: OpenAIImageResult) {
+  if (!result) throw new Error("No image result returned by OpenAI");
+  if (result.b64_json) return dataUrlFromBase64(result.b64_json);
+
+  if (result.url) {
+    const imageResponse = await fetch(result.url);
+    if (!imageResponse.ok) {
+      throw new Error(`OpenAI returned an image URL, but the image download failed ${imageResponse.status}`);
+    }
+
+    const contentType = imageResponse.headers.get("content-type") || "image/png";
+    const bytes = Buffer.from(await imageResponse.arrayBuffer());
+    return `data:${contentType};base64,${bytes.toString("base64")}`;
+  }
+
+  throw new Error(`OpenAI returned no usable image data: ${previewJson(result)}`);
 }
 
 async function selectBestEditCandidate(params: {
@@ -94,7 +126,7 @@ async function selectBestEditCandidate(params: {
 
     params.candidates.forEach((candidate, index) => {
       content.push({ type: "text", text: `Candidate ${index + 1}:` });
-      content.push({ type: "image_url", image_url: { url: dataUrlFromBase64(candidate.b64) } });
+      content.push({ type: "image_url", image_url: { url: candidate.dataUrl } });
     });
 
     const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -242,17 +274,22 @@ export const Route = createFileRoute("/api/image")({
               continue;
             }
 
-            const data = (await upstream.json()) as { data?: { b64_json?: string; revised_prompt?: string }[] };
-            const b64 = data.data?.[0]?.b64_json;
-            if (!b64) {
-              lastError = "No image returned by OpenAI";
+            const data = (await upstream.json()) as { data?: OpenAIImageResult[] };
+            const result = data.data?.[0];
+            if (!result) {
+              lastError = `No image returned by OpenAI. Raw response: ${previewJson(data)}`;
               continue;
             }
-            candidates.push({
-              b64,
-              revisedPrompt: data.data?.[0]?.revised_prompt,
-              attempt,
-            });
+
+            try {
+              candidates.push({
+                dataUrl: await imageResultToDataUrl(result),
+                revisedPrompt: result.revised_prompt,
+                attempt,
+              });
+            } catch (error) {
+              lastError = error instanceof Error ? error.message : "Unable to read OpenAI image result";
+            }
           }
 
           if (candidates.length > 0) {
@@ -265,7 +302,7 @@ export const Route = createFileRoute("/api/image")({
             });
 
             return new Response(JSON.stringify({
-              dataUrl: dataUrlFromBase64(selected.b64),
+              dataUrl: selected.dataUrl,
               text: selected.revisedPrompt ?? "",
               candidateCount: candidates.length,
               selectedCandidate: selected.attempt,
@@ -304,19 +341,26 @@ export const Route = createFileRoute("/api/image")({
           );
         }
 
-        const data = (await upstream.json()) as { data?: { b64_json?: string; revised_prompt?: string }[] };
-        const b64 = data.data?.[0]?.b64_json;
-        if (!b64) {
-          return new Response(JSON.stringify({ error: "No image returned by OpenAI" }), {
+        const data = (await upstream.json()) as { data?: OpenAIImageResult[] };
+        const result = data.data?.[0];
+        if (!result) {
+          return new Response(JSON.stringify({ error: `No image returned by OpenAI. Raw response: ${previewJson(data)}` }), {
             status: 502,
             headers: { "Content-Type": "application/json" },
           });
         }
 
-        return new Response(JSON.stringify({ dataUrl: `data:image/png;base64,${b64}`, text: data.data?.[0]?.revised_prompt ?? "" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
+        try {
+          return new Response(JSON.stringify({ dataUrl: await imageResultToDataUrl(result), text: result.revised_prompt ?? "" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unable to read OpenAI image result" }), {
+            status: 502,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
       },
     },
   },
