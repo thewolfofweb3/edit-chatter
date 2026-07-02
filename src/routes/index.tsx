@@ -278,10 +278,11 @@ function detectMockIntent(text: string, requestedPresetCount = 0): { kind: "vide
 
 function wantsBackgroundSwapWithLockedSubject(text: string) {
   const t = text.toLowerCase();
-  const wantsBackground = /\b(background|backdrop|setting|environment|scene|location|place|world)\b/.test(t);
+  const wantsBackground = /\b(back\s*ground|background|backgorund|backround|backgroun|bg|backdrop|setting|environment|scene|location|place|world)\b/.test(t);
   const wantsChange = /\b(change|replace|swap|put|place|move|set|make|turn|new|different|remove|get rid|delete)\b/.test(t);
-  const wantsLock = /\b(same|exact|keep|preserve|lock|do not change|don't change|dont change|character|subject|person|body|pose|outfit|clothes|face)\b/.test(t);
-  return wantsBackground && wantsChange && wantsLock;
+  const wantsLock = /\b(same|exact|keep|preserve|lock|unchanged|do not change|don't change|dont change|character|subject|person|body|position|pose|outfit|clothes|color|colors|shade|shades|face)\b/.test(t);
+  const lockPhrase = /\bkeep\b[\s\S]{0,80}\b(same|exact|position|pose|color|colors|shade|shades|character|body|outfit|clothes)\b/.test(t);
+  return wantsBackground && wantsChange && (wantsLock || lockPhrase);
 }
 
 function buildMaskHint(
@@ -1389,7 +1390,7 @@ function Studio() {
       if (!r.ok || !data.dataUrl) {
         updateRenderJob(imageJobId, "done", "Image request failed");
         const detail = data.text ? ` Model said: "${data.text.trim()}"` : "";
-        pushMessage("ai", `Image request failed: ${cleanApiError(data.error, "Image generation failed")}${detail}\n\nTip: image models often refuse copyrighted characters. Try a descriptive prompt instead.`);
+        pushMessage("ai", `Image request failed: ${cleanApiError(data.error, isEdit ? "Image edit failed" : "Image generation failed")}${detail}\n\nTip: image models often refuse copyrighted characters. Try a descriptive prompt instead.`);
         return;
       }
 

@@ -238,7 +238,7 @@ export const Route = createFileRoute("/api/image")({
 
             if (!upstream.ok) {
               const errText = await upstream.text();
-              lastError = `OpenAI ${upstream.status}: ${errText.slice(0, 600)}`;
+              lastError = `OpenAI edit ${upstream.status}: ${errText.slice(0, 900)}`;
               continue;
             }
 
@@ -299,7 +299,7 @@ export const Route = createFileRoute("/api/image")({
         if (!upstream.ok) {
           const errText = await upstream.text();
           return new Response(
-            JSON.stringify({ error: `OpenAI ${upstream.status}: ${errText.slice(0, 600)}` }),
+            JSON.stringify({ error: `OpenAI generation ${upstream.status}: ${errText.slice(0, 900)}` }),
             { status: upstream.status, headers: { "Content-Type": "application/json" } },
           );
         }
