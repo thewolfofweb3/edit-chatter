@@ -6,8 +6,8 @@ import {
   MessageSquarePlus, History, Paperclip,
   SquareDashedMousePointer, MousePointer2, Plus, Brush,
   ArrowLeft, Pencil, Trash2, X, FileText, MessageSquare,
-  LayoutGrid, Library, LayoutTemplate,
-  Target, Play, Sparkles, Search, CheckCircle2, Clock3, Wand2, Volume2,
+  LayoutGrid, Library,
+  Target, Play, Sparkles, Search, CheckCircle2, Clock3, Wand2, Volume2, VolumeX,
 } from "lucide-react";
 import { buildMaskDataUrl, compositeWithMask, dataUrlToBase64, loadImage } from "@/lib/imageOps";
 
@@ -43,7 +43,7 @@ type Stroke = Pt[];
 type Preset = { label: string; w: number; h: number; ratio: string };
 type PanelView = "chat" | "history";
 type AssetKind = "image" | "video";
-type WorkspaceRail = "storyboard" | "timeline" | "audio";
+type WorkspaceRail = "storyboard";
 type Asset = {
   id: number;
   name: string;
@@ -59,7 +59,6 @@ type Asset = {
 };
 type Shot = { id: number; assetId: number; label: string };
 type Project = { id: number; name: string; updatedAt: number; shotCount: number };
-type Template = { id: string; name: string; description: string; ratio: string; accent: string };
 type RenderJob = { id: number; label: string; status: "queued" | "running" | "done"; detail: string; createdAt: number };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -68,6 +67,9 @@ function cleanApiError(error: unknown, fallback: string) {
   const message = typeof error === "string" && error.trim() ? error.trim() : fallback;
   if (message.includes("Missing OPENROUTER_API_KEY")) {
     return "API key missing. Add OPENROUTER_API_KEY to your Codespace environment or .env file, then restart the dev server.";
+  }
+  if (message.includes("Missing OPENAI_API_KEY")) {
+    return "OpenAI image key missing. Add OPENAI_API_KEY to your Codespace environment or .env file, then restart the dev server.";
   }
   return message;
 }
@@ -83,8 +85,6 @@ const SIZE_PRESETS: Preset[] = [
 
 const RAIL_CLOSED = 24;
 const STORYBOARD_OPEN = 112;
-const TIMELINE_OPEN = 86;
-const AUDIO_OPEN = 68;
 
 function presetFromAsset(asset: Asset | null | undefined, fallback: Preset): Preset {
   if (!asset?.width || !asset?.height) return fallback;
@@ -95,15 +95,6 @@ function presetFromAsset(asset: Asset | null | undefined, fallback: Preset): Pre
     ratio: asset.ratio ?? `${asset.width} / ${asset.height}`,
   };
 }
-
-const TEMPLATES: Template[] = [
-  { id: "t1", name: "Product Hero", description: "Centered product on gradient with floating bokeh.", ratio: "16 / 9", accent: "from-indigo-500 to-fuchsia-500" },
-  { id: "t2", name: "Vertical Promo", description: "9:16 reel with kinetic text and color sweeps.", ratio: "9 / 16", accent: "from-rose-500 to-amber-400" },
-  { id: "t3", name: "Cinematic Intro", description: "21:9 letterboxed title card with film grain.", ratio: "21 / 9", accent: "from-slate-600 to-cyan-500" },
-  { id: "t4", name: "Square Story", description: "1:1 story tile with bold text overlay.", ratio: "1 / 1", accent: "from-emerald-500 to-teal-400" },
-  { id: "t5", name: "Lookbook Frame", description: "4:5 portrait crop with editorial typography.", ratio: "4 / 5", accent: "from-violet-500 to-pink-400" },
-  { id: "t6", name: "Mood Reel", description: "Mood-board montage with smooth crossfades.", ratio: "16 / 9", accent: "from-orange-500 to-red-500" },
-];
 
 const INITIAL_PROJECTS: Project[] = [
   { id: 101, name: "summer-campaign-2026", updatedAt: Date.now() - 1000 * 60 * 60 * 3, shotCount: 8 },
@@ -379,10 +370,8 @@ function Studio() {
 
   const [input, setInput] = useState("");
   const [chatWidth, setChatWidth] = useState(380);
-  const [railOrder, setRailOrder] = useState<WorkspaceRail[]>(["storyboard", "timeline", "audio"]);
+  const [railOrder, setRailOrder] = useState<WorkspaceRail[]>(["storyboard"]);
   const [storyboardHeight, setStoryboardHeight] = useState(STORYBOARD_OPEN);
-  const [timelineHeight, setTimelineHeight] = useState(RAIL_CLOSED);
-  const [audioHeight, setAudioHeight] = useState(RAIL_CLOSED);
   const [audioMuted, setAudioMuted] = useState(false);
   const [renderMode, setRenderMode] = useState<"draft" | "final">("draft");
   const [shellWidth, setShellWidth] = useState(0);
@@ -411,12 +400,8 @@ function Studio() {
   const outputPreset = presetFromAsset(previewAsset, selectedPreset);
   const hasPreviewOutput = !!previewAsset || !!previewImage;
   const storyboardCollapsed = storyboardHeight < 44;
-  const timelineCollapsed = timelineHeight < 36;
-  const audioCollapsed = audioHeight < 34;
   const railHeightMap: Record<WorkspaceRail, number> = {
     storyboard: storyboardHeight,
-    timeline: timelineHeight,
-    audio: audioHeight,
   };
   const railAnchorFor = (rail: WorkspaceRail) => {
     let anchor = 0;
@@ -426,15 +411,9 @@ function Studio() {
     }
     return anchor;
   };
-  const audioRailAnchor = railAnchorFor("audio");
-  const timelineRailAnchor = railAnchorFor("timeline");
   const storyboardRailAnchor = railAnchorFor("storyboard");
   const storyboardRailTabBottom = Math.max(0, storyboardRailAnchor - 10);
   const storyboardRailConnectorBottom = Math.max(0, storyboardRailAnchor - 3);
-  const timelineRailTabBottom = Math.max(0, timelineRailAnchor - 10);
-  const timelineRailConnectorBottom = Math.max(0, timelineRailAnchor - 3);
-  const audioRailTabBottom = Math.max(0, audioRailAnchor - 10);
-  const audioRailConnectorBottom = Math.max(0, audioRailAnchor - 3);
 
   const draggingRef = useRef(false);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -442,12 +421,6 @@ function Studio() {
   const storyboardDragRef = useRef(false);
   const storyboardPressRef = useRef<{ startY: number } | null>(null);
   const storyboardSuppressClickRef = useRef(false);
-  const timelineDragRef = useRef(false);
-  const timelinePressRef = useRef<{ startY: number } | null>(null);
-  const timelineSuppressClickRef = useRef(false);
-  const audioDragRef = useRef(false);
-  const audioPressRef = useRef<{ startY: number } | null>(null);
-  const audioSuppressClickRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -518,19 +491,12 @@ function Studio() {
 
   function openWorkspaceRail(rail: WorkspaceRail) {
     if (rail === "storyboard") setStoryboardHeight(STORYBOARD_OPEN);
-    if (rail === "timeline") setTimelineHeight(TIMELINE_OPEN);
-    if (rail === "audio") setAudioHeight(AUDIO_OPEN);
   }
 
   function toggleWorkspaceRail(rail: WorkspaceRail) {
-    const isOpen =
-      rail === "storyboard" ? !storyboardCollapsed :
-      rail === "timeline" ? !timelineCollapsed :
-      !audioCollapsed;
+    const isOpen = !storyboardCollapsed;
     if (isOpen) {
       if (rail === "storyboard") setStoryboardHeight(RAIL_CLOSED);
-      if (rail === "timeline") setTimelineHeight(RAIL_CLOSED);
-      if (rail === "audio") setAudioHeight(RAIL_CLOSED);
       return;
     }
     openWorkspaceRail(rail);
@@ -544,31 +510,6 @@ function Studio() {
         .slice(index + 1)
         .reduce((sum, current) => sum + railHeightMap[current], 0);
     };
-    const moveRailToPointer = (rail: WorkspaceRail, clientY: number, rect: DOMRect) => {
-      const totalRailHeight = railOrder.reduce((sum, current) => sum + railHeightMap[current], 0);
-      const stackTop = rect.bottom - totalRailHeight;
-      let cursor = stackTop;
-      let targetIndex = railOrder.length - 1;
-
-      for (let i = 0; i < railOrder.length; i++) {
-        const current = railOrder[i];
-        const center = cursor + railHeightMap[current] / 2;
-        if (clientY < center) {
-          targetIndex = i;
-          break;
-        }
-        cursor += railHeightMap[current];
-      }
-
-      setRailOrder((currentOrder) => {
-        const withoutRail = currentOrder.filter((current) => current !== rail);
-        const insertAt = Math.max(0, Math.min(withoutRail.length, targetIndex));
-        const nextOrder = [...withoutRail];
-        nextOrder.splice(insertAt, 0, rail);
-        return nextOrder.every((current, index) => current === currentOrder[index]) ? currentOrder : nextOrder;
-      });
-    };
-
     function onMove(e: MouseEvent) {
       if (!shellRef.current) return;
       const rect = shellRef.current.getBoundingClientRect();
@@ -577,26 +518,9 @@ function Studio() {
         const press = storyboardPressRef.current;
         if (press && Math.abs(e.clientY - press.startY) > 3) {
           storyboardSuppressClickRef.current = true;
-          moveRailToPointer("storyboard", e.clientY, rect);
         }
         const raw = rect.bottom - e.clientY - heightBelowRail("storyboard");
         setStoryboardHeight(raw < SNAP_CLOSE ? RAIL_CLOSED : Math.max(RAIL_CLOSED, Math.min(STORYBOARD_OPEN, raw)));
-      } else if (timelineDragRef.current) {
-        const press = timelinePressRef.current;
-        if (press && Math.abs(e.clientY - press.startY) > 3) {
-          timelineSuppressClickRef.current = true;
-          moveRailToPointer("timeline", e.clientY, rect);
-        }
-        const raw = rect.bottom - e.clientY - heightBelowRail("timeline");
-        setTimelineHeight(raw < SNAP_CLOSE ? RAIL_CLOSED : Math.max(RAIL_CLOSED, Math.min(TIMELINE_OPEN, raw)));
-      } else if (audioDragRef.current) {
-        const press = audioPressRef.current;
-        if (press && Math.abs(e.clientY - press.startY) > 3) {
-          audioSuppressClickRef.current = true;
-          moveRailToPointer("audio", e.clientY, rect);
-        }
-        const raw = rect.bottom - e.clientY - heightBelowRail("audio");
-        setAudioHeight(raw < SNAP_CLOSE ? RAIL_CLOSED : Math.max(RAIL_CLOSED, Math.min(AUDIO_OPEN, raw)));
       }
     }
     function onUp() {
@@ -604,16 +528,6 @@ function Studio() {
         storyboardDragRef.current = false;
         storyboardPressRef.current = null;
         setTimeout(() => { storyboardSuppressClickRef.current = false; }, 0);
-      }
-      if (timelineDragRef.current) {
-        timelineDragRef.current = false;
-        timelinePressRef.current = null;
-        setTimeout(() => { timelineSuppressClickRef.current = false; }, 0);
-      }
-      if (audioDragRef.current) {
-        audioDragRef.current = false;
-        audioPressRef.current = null;
-        setTimeout(() => { audioSuppressClickRef.current = false; }, 0);
       }
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
@@ -758,6 +672,11 @@ function Studio() {
     const asset: Asset = { ...a, id: Date.now() + Math.floor(Math.random() * 1000), createdAt: Date.now() };
     setAssets((xs) => [asset, ...xs]);
     setRecentAssetIds((ids) => [asset.id, ...ids.filter((id) => id !== asset.id)].slice(0, 6));
+    return asset;
+  }
+  function addExternalAsset(a: Omit<Asset, "id" | "createdAt">) {
+    const asset = addAsset(a);
+    updateAssetDimensions(asset);
     return asset;
   }
   function updateAssetDimensions(asset: Asset) {
@@ -967,8 +886,8 @@ function Studio() {
       ].join("\n"), undefined, { typing: "deliberate" });
       return true;
     }
-    if (/\b(open|go to|show|switch to)\b/.test(t) && /\b(workspace|projects|assets|templates)\b/.test(t)) {
-      const target = /\bprojects\b/.test(t) ? "projects" : /\bassets\b/.test(t) ? "assets" : /\btemplates\b/.test(t) ? "templates" : "workspace";
+    if (/\b(open|go to|show|switch to)\b/.test(t) && /\b(workspace|projects|assets|templates|search|references?)\b/.test(t)) {
+      const target = /\bprojects\b/.test(t) ? "projects" : /\bassets\b/.test(t) ? "assets" : /\b(templates|search|references?)\b/.test(t) ? "search" : "workspace";
       setActiveTab(target);
       pushMessage("ai", "", undefined, {
         cards: [{
@@ -1377,7 +1296,12 @@ function Studio() {
       if (decision.reply) pushMessage("ai", decision.reply);
 
       const isEdit = !!decision.isEdit && !!visibleImage && hasMarkedRegion;
-      const imgPrompt = `${decision.prompt || t}\n\nOutput format: ${activePreset.label}. Compose for ${activePreset.w}x${activePreset.h} (${activePreset.ratio}) and fill the frame edge to edge without letterboxing or empty borders.`;
+      const imgPrompt = [
+        decision.prompt || t,
+        "Style rule: stylized animation/digital art only. No photorealism, no live-action camera look, no realistic human skin texture.",
+        "Keep it suitable for an animated film pipeline with consistent character design, clear silhouettes, graphic lighting, and polished production-art detail.",
+        `Output format: ${activePreset.label}. Compose for ${activePreset.w}x${activePreset.h} (${activePreset.ratio}) and fill the frame edge to edge without letterboxing or empty borders.`,
+      ].join("\n\n");
       const imageJobId = createRenderJob(isEdit ? "Image edit" : "Image generation", activePreset.label);
 
       const r = await fetch("/api/image", {
@@ -1405,14 +1329,22 @@ function Studio() {
         catch (e) { console.error("composite failed, using raw edit", e); }
       }
 
+      let finalWidth = activePreset.w;
+      let finalHeight = activePreset.h;
+      try {
+        const measured = await loadImage(finalDataUrl);
+        finalWidth = measured.naturalWidth || finalWidth;
+        finalHeight = measured.naturalHeight || finalHeight;
+      } catch {}
+
       const a = addAsset({
         name: isEdit ? "edited.png" : "generated.png",
         kind: "image",
         url: finalDataUrl,
-        width: activePreset.w,
-        height: activePreset.h,
-        ratio: activePreset.ratio,
-        sizeLabel: activePreset.label,
+        width: finalWidth,
+        height: finalHeight,
+        ratio: `${finalWidth} / ${finalHeight}`,
+        sizeLabel: `${finalWidth}x${finalHeight}`,
         styleSeed: decision.prompt || t,
       });
       setPreviewImage(finalDataUrl);
@@ -1625,7 +1557,7 @@ function Studio() {
             { id: "workspace", Icon: LayoutGrid, label: "Workspace" },
             { id: "projects", Icon: Folder, label: "Projects" },
             { id: "assets", Icon: Library, label: "Assets" },
-            { id: "templates", Icon: LayoutTemplate, label: "Templates" },
+            { id: "search", Icon: Search, label: "Search Lab" },
           ].map(({ id, Icon, label }) => (
             <button
               key={id}
@@ -1681,58 +1613,6 @@ function Studio() {
                   strokeLinejoin="miter"
                   className="text-foreground/35"
                 />
-              </svg>
-              <button
-                onMouseDown={(e) => {
-                  timelineDragRef.current = true;
-                  timelinePressRef.current = { startY: e.clientY };
-                  document.body.style.cursor = "row-resize";
-                  document.body.style.userSelect = "none";
-                }}
-                onClick={() => {
-                  if (timelineSuppressClickRef.current) return;
-                  toggleWorkspaceRail("timeline");
-                }}
-                className="absolute left-1 flex h-5 w-9 items-center justify-center rounded-[3px] border border-white/10 bg-background/80 text-[5.5px] font-medium lowercase leading-none tracking-[0.01em] text-emerald-200/60 shadow-[0_7px_18px_rgba(0,0,0,0.28)] ring-1 ring-white/5 backdrop-blur transition-colors hover:border-emerald-300/45 hover:text-emerald-100 hover:shadow-[0_0_16px_rgba(110,231,183,0.12)]"
-                style={{ bottom: timelineRailTabBottom }}
-                title={timelineCollapsed ? "Open timeline" : "Drag to resize timeline"}
-              >
-                timeline
-              </button>
-              <svg
-                aria-hidden="true"
-                className="pointer-events-none absolute left-[39px] h-3 w-2.5 overflow-visible text-emerald-300/45"
-                style={{ bottom: timelineRailConnectorBottom }}
-                viewBox="0 0 10 12"
-              >
-                <path d="M 0 6 L 4 6 L 6 9 L 10 9" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="square" strokeLinejoin="miter" />
-                <path d="M 0 6 L 4 6 L 6 9 L 10 9" fill="none" stroke="currentColor" strokeWidth="0.4" strokeLinecap="square" strokeLinejoin="miter" className="text-foreground/35" />
-              </svg>
-              <button
-                onMouseDown={(e) => {
-                  audioDragRef.current = true;
-                  audioPressRef.current = { startY: e.clientY };
-                  document.body.style.cursor = "row-resize";
-                  document.body.style.userSelect = "none";
-                }}
-                onClick={() => {
-                  if (audioSuppressClickRef.current) return;
-                  toggleWorkspaceRail("audio");
-                }}
-                className="absolute left-1 flex h-5 w-9 items-center justify-center rounded-[3px] border border-white/10 bg-background/80 text-[5.5px] font-medium lowercase leading-none tracking-[0.01em] text-amber-200/60 shadow-[0_7px_18px_rgba(0,0,0,0.28)] ring-1 ring-white/5 backdrop-blur transition-colors hover:border-amber-300/45 hover:text-amber-100 hover:shadow-[0_0_16px_rgba(252,211,77,0.12)]"
-                style={{ bottom: audioRailTabBottom }}
-                title={audioCollapsed ? "Open audio" : "Drag to resize audio"}
-              >
-                audio
-              </button>
-              <svg
-                aria-hidden="true"
-                className="pointer-events-none absolute left-[39px] h-3 w-2.5 overflow-visible text-amber-300/45"
-                style={{ bottom: audioRailConnectorBottom }}
-                viewBox="0 0 10 12"
-              >
-                <path d="M 0 6 L 4 6 L 6 9 L 10 9" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="square" strokeLinejoin="miter" />
-                <path d="M 0 6 L 4 6 L 6 9 L 10 9" fill="none" stroke="currentColor" strokeWidth="0.4" strokeLinecap="square" strokeLinejoin="miter" className="text-foreground/35" />
               </svg>
             </>
           )}
@@ -1978,6 +1858,15 @@ function Studio() {
                     </div>
                   )}
                   <div className="hidden h-5 w-px bg-border sm:block" />
+                  <button
+                    onClick={() => setAudioMuted((v) => !v)}
+                    className={`grid h-7 w-7 place-items-center rounded-md border border-white/10 bg-black/20 transition-colors ${
+                      audioMuted ? "text-muted-foreground hover:text-foreground" : "text-foreground hover:bg-white/[0.06]"
+                    }`}
+                    title={audioMuted ? "Unmute music" : "Mute music"}
+                  >
+                    {audioMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                  </button>
                   <div className="hidden h-7 items-center gap-1.5 rounded-md border border-white/10 bg-black/25 px-2 text-[11px] text-muted-foreground sm:flex">
                     <span className={`h-1.5 w-1.5 rounded-full ${hasPreviewOutput ? "bg-emerald-300" : "bg-muted-foreground/35"}`} />
                     <span className="whitespace-nowrap">{outputStatus}</span>
@@ -2205,138 +2094,6 @@ function Studio() {
                 )}
               </div>
 
-              {/* Timeline rail */}
-              <div
-                className="relative shrink-0 border-t border-border bg-panel/50 flex flex-col"
-                style={{ height: timelineHeight, order: railOrder.indexOf("timeline") + 1 }}
-              >
-                <button
-                  onMouseDown={(e) => {
-                    timelineDragRef.current = true;
-                    timelinePressRef.current = { startY: e.clientY };
-                    document.body.style.cursor = "row-resize";
-                    document.body.style.userSelect = "none";
-                  }}
-                  onClick={() => {
-                    if (timelineSuppressClickRef.current) return;
-                    toggleWorkspaceRail("timeline");
-                  }}
-                  className="h-1 shrink-0 cursor-row-resize bg-border transition-colors hover:bg-emerald-400/60"
-                  title={timelineCollapsed ? "Open timeline" : "Resize timeline"}
-                />
-                {!timelineCollapsed && (
-                  <div className="flex min-h-0 flex-1 items-center gap-2.5 px-3">
-                    <div className="flex h-10 w-24 shrink-0 items-center gap-2 rounded-md border border-white/10 bg-black/25 px-2 text-[11px] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <Film className="h-3.5 w-3.5 text-foreground/70" />
-                      <div className="min-w-0">
-                        <div className="text-xs font-medium text-foreground/80">Video</div>
-                        <div className="truncate">{previewVideoDuration}</div>
-                      </div>
-                    </div>
-                    <div className="relative h-12 min-w-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-[#08090b]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <div className="absolute inset-x-0 top-0 flex h-3 items-start justify-between border-b border-white/5 px-2">
-                        {Array.from({ length: 9 }).map((_, i) => (
-                          <span key={`video-tick-${i}`} className="h-1.5 w-px bg-white/12" />
-                        ))}
-                      </div>
-                      <div className="absolute inset-x-2 bottom-1.5 top-4 rounded bg-background/35">
-                        {showVideo && previewAsset ? (
-                          <button
-                            onClick={togglePreviewPlayback}
-                            className="absolute inset-y-0 left-0 flex w-[54%] min-w-[150px] items-center overflow-hidden rounded border border-emerald-300/45 bg-emerald-300/10 text-left shadow-[0_0_20px_rgba(52,211,153,0.08)] transition-colors hover:border-emerald-200/70"
-                            title={isPreviewPlaying ? "Pause preview output" : "Play preview output"}
-                          >
-                            {previewAsset.poster ? (
-                              <img src={previewAsset.poster} alt="" className="h-full w-14 shrink-0 object-cover opacity-80" />
-                            ) : (
-                              <div className="h-full w-14 shrink-0 bg-emerald-300/15" />
-                            )}
-                            <div className="min-w-0 px-2">
-                              <div className="truncate text-[11px] font-medium text-foreground">preview output</div>
-                              <div className="text-[10px] text-muted-foreground">{previewVideoDuration}</div>
-                            </div>
-                          </button>
-                        ) : (
-                          <div className="absolute inset-0 flex items-center rounded border border-dashed border-white/10 px-3 text-[11px] text-muted-foreground/65">
-                            Preview output track
-                          </div>
-                        )}
-                      </div>
-                      <div className="absolute bottom-1 top-0 left-[18%] w-px bg-white/45 shadow-[0_0_10px_rgba(255,255,255,0.2)]" />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Audio rail */}
-              <div
-                className="relative shrink-0 border-t border-border bg-panel/45 flex flex-col"
-                style={{ height: audioHeight, order: railOrder.indexOf("audio") + 1 }}
-              >
-                <button
-                  onMouseDown={(e) => {
-                    audioDragRef.current = true;
-                    audioPressRef.current = { startY: e.clientY };
-                    document.body.style.cursor = "row-resize";
-                    document.body.style.userSelect = "none";
-                  }}
-                  onClick={() => {
-                    if (audioSuppressClickRef.current) return;
-                    toggleWorkspaceRail("audio");
-                  }}
-                  className="h-1 shrink-0 cursor-row-resize bg-border transition-colors hover:bg-amber-300/60"
-                  title={audioCollapsed ? "Open audio" : "Resize audio"}
-                />
-                {!audioCollapsed && (
-                  <div className="flex min-h-0 flex-1 items-center gap-2.5 px-3">
-                    <div className="flex h-10 w-24 shrink-0 items-center gap-2 rounded-md border border-white/10 bg-black/25 px-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <button
-                        onClick={() => setAudioMuted((v) => !v)}
-                        className={`grid h-7 w-7 shrink-0 place-items-center rounded border transition-colors ${
-                          audioMuted ? "border-white/10 bg-black/35 text-muted-foreground hover:text-foreground" : "border-white/20 bg-white/[0.06] text-foreground hover:bg-white/[0.09]"
-                        }`}
-                        title={audioMuted ? "Enable music" : "Mute music"}
-                      >
-                        <Volume2 className="h-3.5 w-3.5" />
-                      </button>
-                      <div className="min-w-0 text-[11px] leading-tight">
-                        <div className="text-xs font-medium text-foreground/80">Audio</div>
-                        <div className="truncate text-muted-foreground">{audioMuted ? "muted" : "bed 0 dB"}</div>
-                      </div>
-                    </div>
-                    <div className="relative h-10 min-w-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-[#08090b]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <div className="absolute inset-x-0 top-0 flex h-2.5 justify-between px-2">
-                        {Array.from({ length: 12 }).map((_, i) => (
-                          <span key={`audio-tick-${i}`} className="h-1.5 w-px bg-white/10" />
-                        ))}
-                      </div>
-                      <div className="absolute left-3 right-3 top-1/2 h-px bg-white/10" />
-                      <svg
-                        aria-hidden="true"
-                        className={`absolute inset-x-3 top-2 h-6 w-[calc(100%-1.5rem)] ${audioMuted ? "opacity-30" : "opacity-90"}`}
-                        viewBox="0 0 800 40"
-                        preserveAspectRatio="none"
-                      >
-                        <path
-                          d="M0 20 C28 14 45 10 70 20 S120 28 150 18 S205 8 244 19 S305 31 352 18 S424 9 470 22 S535 33 588 19 S665 7 710 20 S768 28 800 18"
-                          fill="none"
-                          stroke="rgba(255,255,255,0.28)"
-                          strokeWidth="1.4"
-                        />
-                        <path
-                          d="M0 20 C35 24 58 31 92 20 S144 9 185 21 S238 30 284 20 S352 8 405 21 S486 32 535 19 S600 10 646 20 S730 29 800 20"
-                          fill="none"
-                          stroke={audioMuted ? "rgba(148,163,184,0.36)" : "rgba(245,222,179,0.72)"}
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      <div className="absolute bottom-1 top-0 left-[18%] w-px bg-white/35 shadow-[0_0_8px_rgba(255,255,255,0.16)]" />
-                    </div>
-                  </div>
-                )}
-              </div>
-
             </>
           ) : activeTab === "projects" ? (
             <PanelProjects
@@ -2352,27 +2109,11 @@ function Studio() {
               onMoveToStoryboard={moveAssetsToStoryboard}
               onDelete={deleteAssetById}
             />
-          ) : activeTab === "templates" ? (
-            <PanelTemplates
-              templates={TEMPLATES}
-              onUse={(tpl) => {
-                const idx = SIZE_PRESETS.findIndex((p) => p.ratio === tpl.ratio);
-                if (idx >= 0) setSizeIdx(idx);
-                const tplPreset = SIZE_PRESETS[idx >= 0 ? idx : sizeIdx];
-                const url = makeMockImage(tpl.name, tplPreset.w, tplPreset.h);
-                const a = addAsset({
-                  name: `${tpl.name}.png`,
-                  kind: "image",
-                  url,
-                  width: tplPreset.w,
-                  height: tplPreset.h,
-                  ratio: tplPreset.ratio,
-                  sizeLabel: tplPreset.label,
-                  styleSeed: tpl.name,
-                });
-                setPreviewAssetId(a.id); setPreviewImage(url);
-                setActiveTab("workspace");
-              }}
+          ) : activeTab === "search" ? (
+            <PanelSearchLab
+              presets={SIZE_PRESETS}
+              onAddAsset={addExternalAsset}
+              onOpenAssets={() => setActiveTab("assets")}
             />
           ) : activeTab === "settings" ? (
             <PanelSettings
@@ -3033,30 +2774,119 @@ function PanelAssets({
   );
 }
 
-function PanelTemplates({ templates, onUse }: { templates: Template[]; onUse: (t: Template) => void }) {
+function PanelSearchLab({
+  presets,
+  onAddAsset,
+  onOpenAssets,
+}: {
+  presets: Preset[];
+  onAddAsset: (asset: Omit<Asset, "id" | "createdAt">) => Asset;
+  onOpenAssets: () => void;
+}) {
+  const [q, setQ] = useState("anime warrior reference");
+  const [url, setUrl] = useState("");
+  const results = [
+    { title: "Character turnaround", preset: presets[1], seed: `${q} character model sheet` },
+    { title: "Expression sheet", preset: presets[2], seed: `${q} expressive faces clean animation` },
+    { title: "Cinematic background", preset: presets[0], seed: `${q} painted environment establishing shot` },
+    { title: "Action pose", preset: presets[3], seed: `${q} dynamic action pose cel shaded` },
+    { title: "Mood frame", preset: presets[4], seed: `${q} dramatic color key animation` },
+    { title: "Prop reference", preset: presets[2], seed: `${q} stylized prop reference` },
+  ];
+
+  function addGeneratedReference(result: { title: string; preset: Preset; seed: string }) {
+    onAddAsset({
+      name: `${result.title.toLowerCase().replace(/\s+/g, "-")}.png`,
+      kind: "image",
+      url: makeMockImage(result.seed, result.preset.w, result.preset.h),
+      width: result.preset.w,
+      height: result.preset.h,
+      ratio: result.preset.ratio,
+      sizeLabel: result.preset.label,
+      styleSeed: result.seed,
+    });
+  }
+
+  function addUrlReference() {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    onAddAsset({
+      name: trimmed.split("/").pop()?.split("?")[0] || "reference-image",
+      kind: "image",
+      url: trimmed,
+      styleSeed: q,
+    });
+    setUrl("");
+  }
+
   return (
     <div className="flex-1 overflow-y-auto">
-      <PanelHeader title="Templates" subtitle="Pre-sized starting points with a mock keyframe." />
-      <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {templates.map((t) => (
-          <div key={t.id} className="rounded-lg border border-border bg-panel overflow-hidden hover:border-primary/60 transition-colors">
-            <div className={`aspect-video bg-gradient-to-br ${t.accent} relative`}>
-              <div className="absolute inset-0 grid place-items-center text-white/90 text-sm font-medium drop-shadow">
-                {t.ratio}
-              </div>
-            </div>
-            <div className="p-3">
-              <div className="font-medium text-sm">{t.name}</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{t.description}</div>
-              <button
-                onClick={() => onUse(t)}
-                className="mt-2 h-7 px-2.5 rounded-md bg-accent text-foreground text-xs font-medium flex items-center gap-1.5 hover:bg-accent/80"
-              >
-                <Sparkles className="h-3 w-3" /> Use template
-              </button>
-            </div>
+      <PanelHeader title="Search Lab" subtitle="Find or import animation references, then send them to Assets.">
+        <button
+          onClick={onOpenAssets}
+          className="h-8 px-3 rounded-md border border-border bg-background/40 text-xs font-medium text-foreground hover:bg-accent"
+        >
+          Open Assets
+        </button>
+      </PanelHeader>
+      <div className="grid gap-4 p-6">
+        <div className="rounded-lg border border-border bg-panel p-3">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-input/50 px-3">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search animation references..."
+              className="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
           </div>
-        ))}
+          <div className="mt-3 flex gap-2">
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="Paste direct image URL..."
+              className="h-9 flex-1 rounded-md border border-border bg-input/40 px-3 text-sm outline-none focus:border-primary/60"
+            />
+            <button
+              onClick={addUrlReference}
+              disabled={!url.trim()}
+              className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium disabled:opacity-40"
+            >
+              Add URL
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {results.map((result) => {
+            const preview = makeMockImage(result.seed, result.preset.w, result.preset.h);
+            return (
+              <div key={`${result.title}-${result.seed}`} className="overflow-hidden rounded-lg border border-border bg-panel transition-colors hover:border-primary/60">
+                <div className="flex h-48 items-center justify-center bg-black p-3">
+                  <div className="relative max-h-full max-w-full overflow-hidden rounded-lg bg-black" style={{ aspectRatio: result.preset.ratio, width: "100%" }}>
+                    <img src={preview} alt={result.title} className="absolute inset-0 h-full w-full object-cover" />
+                  </div>
+                </div>
+                <div className="border-t border-border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{result.title}</div>
+                      <div className="mt-0.5 text-[11px] uppercase text-muted-foreground">{result.preset.label}</div>
+                    </div>
+                    <button
+                      onClick={() => addGeneratedReference(result)}
+                      className="h-8 shrink-0 rounded-md bg-accent px-2.5 text-xs font-medium text-foreground hover:bg-accent/80"
+                    >
+                      Add to Assets
+                    </button>
+                  </div>
+                  <div className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                    Stylized animation reference generated from: {q}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
