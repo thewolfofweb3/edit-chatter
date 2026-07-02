@@ -82,6 +82,16 @@ function cleanApiError(error: unknown, fallback: string) {
   return message;
 }
 
+async function readJsonResponse(response: Response): Promise<any> {
+  const text = await response.text();
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text.slice(0, 700) };
+  }
+}
+
 const SIZE_PRESETS: Preset[] = [
   { label: "Landscape · 1920×1080", w: 1920, h: 1080, ratio: "16 / 9" },
   { label: "Portrait · 1080×1920", w: 1080, h: 1920, ratio: "9 / 16" },
@@ -264,6 +274,14 @@ function detectMockIntent(text: string, requestedPresetCount = 0): { kind: "vide
   if (wantVideo && !wantKey && !wantBoard) return { kind: "video", count: 1 };
   if (wantBoard) return { kind: "storyboard", count };
   return { kind: "keyframe", count };
+}
+
+function wantsBackgroundSwapWithLockedSubject(text: string) {
+  const t = text.toLowerCase();
+  const wantsBackground = /\b(background|backdrop|setting|environment|scene|location|place|world)\b/.test(t);
+  const wantsChange = /\b(change|replace|swap|put|place|move|set|make|turn|new|different|remove|get rid|delete)\b/.test(t);
+  const wantsLock = /\b(same|exact|keep|preserve|lock|do not change|don't change|dont change|character|subject|person|body|pose|outfit|clothes|face)\b/.test(t);
+  return wantsBackground && wantsChange && wantsLock;
 }
 
 function buildMaskHint(
@@ -1323,7 +1341,7 @@ function Studio() {
           },
         }),
       });
-      const decision = await routeRes.json();
+      const decision = await readJsonResponse(routeRes);
       if (!routeRes.ok) {
         pushMessage("ai", `Setup issue: ${cleanApiError(decision.error, "Orchestrator failed")}`);
         return;
@@ -1336,13 +1354,15 @@ function Studio() {
 
       if (decision.reply) pushMessage("ai", decision.reply);
 
-      const isEdit = !!decision.isEdit && !!visibleImage && hasMarkedRegion;
+      const isBackgroundSwap = !!visibleImage && !showVideo && wantsBackgroundSwapWithLockedSubject(t);
+      const isEdit = !!visibleImage && !showVideo && (!!decision.isEdit || hasMarkedRegion || isBackgroundSwap);
       const imgPrompt = [
         decision.prompt || t,
         "Style rule: animation/digital art is the default product language. For new generations, avoid photorealism, live-action camera look, realistic human skin texture, stock-photo interiors, documentary photography, or real-world product photography.",
         "Build it like an animation expert made it: coherent designed setting, character-safe proportions, intentional color scripting, clean readable silhouette, graphic lighting, polished edges, and production-art detail.",
         "If this is an edit on an uploaded real photo, preserve the real photo when needed and integrate any animated character/element into it with professional compositing, matching scale, perspective, contact shadows, and light direction. Otherwise keep the entire output in a stylized animated world.",
         isEdit ? "Marked-region edit rule: use the highlight/brush as the focus for what must change, but return a blended full-frame edit. Do not paste a separate small character, icon, card, sticker, bordered patch, or screenshot inside the highlighted area." : "",
+        isBackgroundSwap ? "Character-lock background swap: keep the exact same foreground character from the source image. Preserve the same pose, body proportions, silhouette, outfit/clothing color, line art, face/head shape, scale, and placement. Change only the background/setting/environment unless the user explicitly asks to alter the character." : "",
         `Output format: ${activePreset.label}. Compose for ${activePreset.w}x${activePreset.h} (${activePreset.ratio}) and fill the frame edge to edge without letterboxing or empty borders.`,
       ].filter(Boolean).join("\n\n");
       const imageJobId = createRenderJob(isEdit ? "Image edit" : "Image generation", activePreset.label);
@@ -1362,9 +1382,10 @@ function Studio() {
           maskBase64: isEdit && maskDataUrl ? dataUrlToBase64(maskDataUrl) : undefined,
           sourceKind: isEdit && previewAsset?.styleSeed ? "generated" : "uploaded-or-unknown",
           maskHint: isEdit ? maskHint : undefined,
+          editIntent: isBackgroundSwap ? "background-swap" : hasMarkedRegion ? "marked-region" : "general-edit",
         }),
       });
-      const data = await r.json();
+      const data = await readJsonResponse(r);
       if (!r.ok || !data.dataUrl) {
         updateRenderJob(imageJobId, "done", "Image request failed");
         const detail = data.text ? ` Model said: "${data.text.trim()}"` : "";

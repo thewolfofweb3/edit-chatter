@@ -10,6 +10,7 @@ type ImageRequest = {
   maskBase64?: string;  // alpha mask: opaque = marked focus, transparent = context
   size?: { width: number; height: number; ratio?: string; label?: string };
   sourceKind?: "generated" | "uploaded-or-unknown";
+  editIntent?: "marked-region" | "background-swap" | "general-edit";
   maskHint?: {
     x: number;
     y: number;
@@ -57,12 +58,15 @@ function editPrompt(
   size?: ImageRequest["size"],
   sourceKind: ImageRequest["sourceKind"] = "uploaded-or-unknown",
   maskHint?: ImageRequest["maskHint"],
+  editIntent: ImageRequest["editIntent"] = "general-edit",
   candidate = 1,
 ) {
   const sourceRule = sourceKind === "generated"
     ? "The source is a Reel Studio generated output. Keep the result in a fully animated/digital world. If the source drifted into a realistic photo setting, repaint the setting as designed animation background art while preserving the user's requested subject and composition."
     : "The source may be an uploaded real photo. If the user is placing an animated character/object into the photo, preserve the real photo and integrate the animated element like professional compositing/VFX with matched contact shadows, scale, perspective, occlusion, and light direction.";
-  const regionRule = maskHint
+  const regionRule = editIntent === "background-swap"
+    ? "Background swap cue: use the source image as the character reference. Keep the foreground character locked exactly: same pose, body proportions, silhouette, clothing color, outline weight, head/face shape, scale, and position. Change only the background/environment/setting."
+    : maskHint
     ? `Marked region cue: the user marked the ${maskHint.vertical}-${maskHint.horizontal} area of the image, covering about ${Math.round(maskHint.width * 100)}% width by ${Math.round(maskHint.height * 100)}% height. Treat that marked area as the exact body part/object to transform. If the user names an arm, hand, leg, face, prop, or color, apply the change to the marked part on that same visible side, not the opposite side.`
     : "Marked region cue: treat the mask as the exact body part/object the user is pointing at.";
 
@@ -71,7 +75,10 @@ function editPrompt(
     sourceRule,
     regionRule,
     "Edit workflow:",
-    "- Preserve the background, camera angle, framing, character identity, clothing, colors, line style, lighting direction, and unmarked body parts as tightly as possible.",
+    editIntent === "background-swap"
+      ? "- Preserve camera angle, framing, character identity, clothing, colors, line style, lighting direction on the character, and all foreground character details as tightly as possible."
+      : "- Preserve the background, camera angle, framing, character identity, clothing, colors, line style, lighting direction, and unmarked body parts as tightly as possible.",
+    editIntent === "background-swap" ? "- For this background swap, preserve the entire character as if rotoscoped/cut out from the source, but render it naturally in the new animated environment. Do not recolor the character, change the pose, slim/widen the body, redraw the outfit, or shift the character unless necessary for frame fit." : "",
     "- The marked region identifies what to change. It is not permission to replace the scene, swap the character, move the camera, change the background, or edit the opposite limb.",
     "- When changing anatomy, clothing, pose, expression, props, color, lighting, or texture, rebuild the selected part and its natural connection points so it blends into the surrounding line art, shadows, perspective, and style.",
     "- For pose edits, keep the same character identity and body scale; adjust only the necessary connected anatomy so limbs attach correctly and the silhouette reads clearly.",
@@ -79,7 +86,7 @@ function editPrompt(
     "- Never insert a tiny new character, icon, card, white box, sticker, screenshot, or bordered patch inside the highlighted area.",
     "- Do not leave visible mask edges, rectangular patches, selection borders, mismatched resolution, or pasted-card artifacts.",
     `Candidate pass ${candidate}: prioritize scene preservation first, requested edit second, and stylistic consistency third. A boring but accurate edit is better than a dramatic scene rewrite.`,
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 function base64ToFile(base64: string, name: string, type = "image/png") {
@@ -133,7 +140,7 @@ export const Route = createFileRoute("/api/image")({
           for (let attempt = 1; attempt <= attempts; attempt++) {
             const form = new FormData();
             form.set("model", imageModel);
-            form.set("prompt", editPrompt(body.prompt, body.size, body.sourceKind, body.maskHint, attempt));
+            form.set("prompt", editPrompt(body.prompt, body.size, body.sourceKind, body.maskHint, body.editIntent, attempt));
             form.set("size", size);
             form.set("quality", process.env.OPENAI_IMAGE_QUALITY || "high");
             form.set("image", base64ToFile(body.imageBase64, "source.png"));
