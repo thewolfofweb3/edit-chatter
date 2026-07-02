@@ -28,7 +28,7 @@ type InventoryAction =
   | { label: string; action: "prompt"; prompt: string };
 type InventoryCard = {
   id: string;
-  kind: "asset-batch" | "storyboard-batch" | "workspace-action" | "director-brief" | "render-queue";
+  kind: "asset-batch" | "storyboard-batch" | "workspace-action" | "render-queue";
   title: string;
   subtitle?: string;
   stats?: { label: string; value: string }[];
@@ -60,7 +60,6 @@ type Asset = {
 type Shot = { id: number; assetId: number; label: string };
 type Project = { id: number; name: string; updatedAt: number; shotCount: number };
 type Template = { id: string; name: string; description: string; ratio: string; accent: string };
-type DirectorBrief = { goal: string; style: string; camera: string; notes: string };
 type RenderJob = { id: number; label: string; status: "queued" | "running" | "done"; detail: string; createdAt: number };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -112,16 +111,9 @@ const INITIAL_PROJECTS: Project[] = [
   { id: 103, name: "product-launch-reel", updatedAt: Date.now() - 1000 * 60 * 60 * 72, shotCount: 12 },
 ];
 
-const DEFAULT_DIRECTOR_BRIEF: DirectorBrief = {
-  goal: "Build a cinematic trailer flow",
-  style: "Anime-influenced, dramatic, high contrast",
-  camera: "Wide establishing shots, controlled close-ups",
-  notes: "Storyboard is input. Preview is output.",
-};
-
 const AI_COMMAND_INVENTORY = [
   { name: "Navigate workspace", intent: "open or switch between workspace pages" },
-  { name: "Update Director Brief", intent: "save style, camera, goal, rules, and creative notes" },
+  { name: "Track creative context", intent: "use the current prompt, storyboard, assets, marks, and project state as generation context" },
   { name: "Generate asset batch", intent: "create one or more image assets with requested dimensions" },
   { name: "Build storyboard", intent: "create storyboard input shots and store them in Assets" },
   { name: "Create motion preview", intent: "render a short video output in Preview" },
@@ -332,7 +324,6 @@ function Studio() {
   const [recentAssetIds, setRecentAssetIds] = useState<number[]>([]);
   const [shots, setShots] = useState<Shot[]>([]);
   const [previewAssetId, setPreviewAssetId] = useState<number | null>(null);
-  const [directorBrief, setDirectorBrief] = useState<DirectorBrief>(DEFAULT_DIRECTOR_BRIEF);
   const [renderJobs, setRenderJobs] = useState<RenderJob[]>([]);
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
   const [shotPickerOpen, setShotPickerOpen] = useState(false);
@@ -710,6 +701,7 @@ function Studio() {
   const previewVideoDuration = showVideo ? "00:03" : "00:00";
   const renderSeed = previewAsset ? String(previewAsset.createdAt).slice(-5) : "-----";
   const outputStatus = hasPreviewOutput ? (showVideo ? "video ready" : "image ready") : "empty";
+  const latestRenderJob = renderJobs[0] ?? null;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -825,18 +817,6 @@ function Studio() {
       job.id === id ? { ...job, status, detail: detail ?? job.detail } : job
     )));
   }
-  function updateDirectorBriefFromPrompt(text: string) {
-    const cleaned = text.replace(/\b(update|set|change|make|use|director|brief|style|camera|notes?|goal|vibe|tone|to|as)\b/gi, " ").replace(/\s+/g, " ").trim();
-    const nextText = cleaned || text.trim();
-    setDirectorBrief((brief) => ({
-      ...brief,
-      style: /\b(style|vibe|tone|look|aesthetic|anime|cinematic|realistic|dark|bright)\b/i.test(text) ? nextText : brief.style,
-      camera: /\b(camera|shot|close|wide|angle|lens|movement|pan|zoom)\b/i.test(text) ? nextText : brief.camera,
-      goal: /\b(goal|trailer|video|film|scene|story|make|create|build)\b/i.test(text) ? nextText : brief.goal,
-      notes: /\b(note|remember|rule|constraint|keep|avoid)\b/i.test(text) ? nextText : brief.notes,
-    }));
-    return nextText;
-  }
   function runInventoryAction(action: InventoryAction) {
     if (action.action === "open-assets") {
       setActiveTab("assets");
@@ -918,6 +898,30 @@ function Studio() {
     }
     return imageAssets.length === 1 ? imageAssets[0] : null;
   }
+  function findAssetsMentioned(text: string) {
+    const t = text.toLowerCase();
+    if (/\b(latest|recent|newest)\b/.test(t)) return recentAssets.slice(0, 1);
+    if (/\b(all|everything|every asset|all assets)\b/.test(t)) return assets.slice(0, 12);
+    const normalized = (value: string) => value.toLowerCase().replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+    const matches = assets.filter((asset) => {
+      const name = normalized(asset.name);
+      if (name.length > 2 && t.includes(name)) return true;
+      return name.split(/\s+/).some((part) => part.length > 3 && t.includes(part));
+    });
+    return matches.slice(0, 12);
+  }
+  function moveShotByPositions(fromPosition: number, toPosition: number) {
+    setShots((xs) => {
+      const from = Math.max(0, Math.min(xs.length - 1, fromPosition - 1));
+      const to = Math.max(0, Math.min(xs.length - 1, toPosition - 1));
+      if (from === to || xs.length < 2) return xs;
+      const next = [...xs];
+      const [shot] = next.splice(from, 1);
+      next.splice(to, 0, shot);
+      setSelectedShotId(shot.id);
+      return next;
+    });
+  }
   async function convertAssetToPreset(asset: Asset, preset: Preset) {
     const seed = asset.styleSeed ?? asset.name.replace(/\.[^.]+$/, "");
     const url = makeMockImage(seed, preset.w, preset.h);
@@ -951,17 +955,14 @@ function Studio() {
         `- Read the current workspace state: ${assets.length} asset${assets.length === 1 ? "" : "s"}, ${shots.length} storyboard shot${shots.length === 1 ? "" : "s"}, preview is ${showVideo ? "showing a video output" : visibleImage ? "showing an image output" : "empty"}`,
         "- Help plan scenes, shots, trailers, anime sequences, and cinematic prompts",
         "- Create mock storyboard/keyframe/video placeholders for planning",
-        "- Keep a Director Brief for style, camera, goal, and project rules",
         "- Track generation work in a render queue so you can see what just happened",
-        "- Use internal app commands to open pages, move assets, update the brief, and prepare exports",
+        "- Use internal app commands to open pages, move assets, read marked regions, and prepare exports",
+        "- Add named assets to the storyboard and reorder shots from chat",
         "- Clear the preview/output or clear the storyboard when you ask",
         "- Delete the current preview asset, or the only asset if there is just one",
         "- Explain how Assets, Storyboard, Preview, drawing tools, and Chat work together",
         "",
         "**Planned next:**",
-        "- Find assets by name from chat",
-        "- Add named assets to the storyboard without clicking",
-        "- Reorder shots from chat",
         "- Send storyboard context into real image/video APIs",
       ].join("\n"), undefined, { typing: "deliberate" });
       return true;
@@ -983,30 +984,54 @@ function Studio() {
       });
       return true;
     }
-    if (/\b(brief|director|style|vibe|tone|camera|goal|remember|rule|constraint)\b/.test(t) && /\b(update|set|change|make|use|keep|avoid|remember)\b/.test(t)) {
-      setThinkingLabel("Updating director brief");
-      await wait(400);
-      const saved = updateDirectorBriefFromPrompt(text);
+    const reorderMatch = t.match(/\b(?:move|put|place)\s+(?:shot\s*)?(\d+)\s+(?:before|to|after|in front of|ahead of)\s+(?:shot\s*)?(\d+)\b/);
+    if (reorderMatch && shots.length > 1) {
+      setThinkingLabel("Reordering storyboard");
+      await wait(300);
+      const from = parseInt(reorderMatch[1], 10);
+      const target = parseInt(reorderMatch[2], 10);
+      const after = /\bafter\b/.test(reorderMatch[0]);
+      moveShotByPositions(from, after ? target + 1 : target);
       pushMessage("ai", "", undefined, {
         typing: "deliberate",
         cards: [{
-          id: `inventory-brief-${Date.now()}`,
-          kind: "director-brief",
-          title: "Director Brief updated",
-          subtitle: "The workspace brain will use this as creative context.",
+          id: `inventory-reorder-${Date.now()}`,
+          kind: "storyboard-batch",
+          title: `Moved shot ${from} ${after ? "after" : "to"} ${after ? target : target}`,
+          subtitle: "Storyboard order updated from chat.",
           stats: [
-            { label: "Saved", value: saved.slice(0, 36) || "Brief updated" },
-            { label: "Inputs", value: `${shots.length} shots · ${assets.length} assets` },
-            { label: "Output", value: outputStatus },
-            { label: "Size", value: activePreset.label },
-          ],
-          actions: [
-            { label: "Build From Brief", action: "prompt", prompt: "Use the Director Brief and storyboard inputs to generate a cinematic preview output." },
-            { label: "Create Shots", action: "prompt", prompt: "Generate 6 storyboard shots using the current Director Brief." },
+            { label: "Shots", value: String(shots.length) },
+            { label: "Command", value: "Reorder" },
           ],
         }],
       });
       return true;
+    }
+    if (/\b(add|move|send|place)\b/.test(t) && /\b(storyboard|story\s*board|shots?)\b/.test(t)) {
+      const named = findAssetsMentioned(text);
+      if (named.length > 0) {
+        setThinkingLabel("Updating storyboard");
+        await wait(350);
+        moveAssetsToStoryboard(named);
+        pushMessage("ai", "", undefined, {
+          typing: "deliberate",
+          cards: [{
+            id: `inventory-named-storyboard-${Date.now()}`,
+            kind: "storyboard-batch",
+            title: `${named.length} named asset${named.length === 1 ? "" : "s"} added`,
+            subtitle: "Matched from your asset library and added to the storyboard input rail.",
+            stats: [
+              { label: "Added", value: String(named.length) },
+              { label: "Storyboard", value: `${shots.length + named.length} shots` },
+            ],
+            actions: [
+              { label: "Create Preview", action: "prompt", prompt: "Use the storyboard inputs and project context to create a cinematic preview output." },
+              { label: "Open Assets", action: "open-assets" },
+            ],
+          }],
+        });
+        return true;
+      }
     }
     if (/\b(export|save|download|tiktok|instagram|youtube|shorts|reels?)\b/.test(t) && /\b(preview|output|video|image|current|this)\b/.test(t)) {
       setExportOpen(true);
@@ -1025,7 +1050,7 @@ function Studio() {
             { label: "TikTok Prep", action: "prompt", prompt: "Prepare this preview output for TikTok or Shorts. Tell me whether it needs portrait reframing." },
             { label: "YouTube Prep", action: "prompt", prompt: "Prepare this preview output for YouTube landscape delivery." },
           ] : [
-            { label: "Generate Output", action: "prompt", prompt: "Generate a cinematic preview output using the current Director Brief and storyboard context." },
+            { label: "Generate Output", action: "prompt", prompt: "Generate a cinematic preview output using the current storyboard and asset context." },
           ],
         }],
       });
@@ -1052,7 +1077,7 @@ function Studio() {
             { label: "Storyboard", value: `${shots.length + selected.length} shots` },
           ],
           actions: [
-            { label: "Create Preview", action: "prompt", prompt: "Use the storyboard inputs and Director Brief to create a cinematic preview output." },
+            { label: "Create Preview", action: "prompt", prompt: "Use the storyboard inputs and project context to create a cinematic preview output." },
             { label: "Open Assets", action: "open-assets" },
           ],
         }],
@@ -1331,7 +1356,6 @@ function Studio() {
             shotCount: shots.length,
             previewState: showVideo ? "video" : visibleImage ? "image" : "empty",
             requestedSize: activePreset.label,
-            directorBrief,
             commandInventory: AI_COMMAND_INVENTORY,
             selectedShotLabel: shots.find((s) => s.id === selectedShotId)?.label ?? null,
             assetNames: assets.slice(0, 24).map((a) => a.name),
@@ -1745,83 +1769,6 @@ function Studio() {
                   ))}
                 </div>
 
-                {/* Director brief */}
-                <div className="absolute left-4 top-4 z-10 hidden w-[264px] overflow-hidden rounded-lg border border-white/10 bg-panel/82 shadow-xl ring-1 ring-white/5 backdrop-blur xl:block">
-                  <div className="flex items-center justify-between border-b border-white/10 px-2.5 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="grid h-6 w-6 place-items-center rounded-md border border-white/10 bg-black/25 text-primary">
-                        <Target className="h-3.5 w-3.5" />
-                      </span>
-                      <div>
-                        <div className="text-xs font-medium text-foreground">Director Brief</div>
-                        <div className="text-[10px] text-muted-foreground">live creative memory</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => cuePrompt("Update the Director Brief for this project with the style, camera language, and rules I describe next.")}
-                      className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      title="Update Director Brief"
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                  </div>
-                  <div className="grid gap-1.5 p-2">
-                    {[
-                      ["Goal", directorBrief.goal],
-                      ["Style", directorBrief.style],
-                      ["Camera", directorBrief.camera],
-                      ["Notes", directorBrief.notes],
-                    ].map(([label, value]) => (
-                      <button
-                        key={label}
-                        onClick={() => cuePrompt(`Change the Director Brief ${label.toLowerCase()} to `)}
-                        className="group flex items-start gap-2 rounded-md border border-white/5 bg-black/15 px-2 py-1.5 text-left transition-colors hover:border-white/15 hover:bg-black/25"
-                      >
-                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70 shadow-[0_0_10px_rgba(255,255,255,0.18)]" />
-                        <span className="min-w-0">
-                          <span className="block text-[9px] uppercase tracking-[0.08em] text-muted-foreground/70">{label}</span>
-                          <span className="block truncate text-[11px] text-foreground/85 group-hover:text-foreground">{value}</span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Render queue */}
-                {renderJobs.length > 0 && (
-                  <div className="absolute bottom-16 left-4 z-10 hidden w-[264px] overflow-hidden rounded-lg border border-white/10 bg-panel/82 shadow-xl ring-1 ring-white/5 backdrop-blur xl:block">
-                    <div className="flex items-center justify-between border-b border-white/10 px-2.5 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="grid h-6 w-6 place-items-center rounded-md border border-white/10 bg-black/25 text-emerald-200">
-                          <Clock3 className="h-3.5 w-3.5" />
-                        </span>
-                        <div>
-                          <div className="text-xs font-medium text-foreground">Render Queue</div>
-                          <div className="text-[10px] text-muted-foreground">latest workspace jobs</div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setRenderJobs([])}
-                        className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        title="Clear render queue"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <div className="max-h-32 space-y-1 overflow-y-auto p-2">
-                      {renderJobs.map((job) => (
-                        <div key={job.id} className="flex items-start gap-2 rounded-md border border-white/5 bg-black/15 px-2 py-1.5">
-                          <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${job.status === "done" ? "bg-emerald-300" : "bg-primary animate-pulse"}`} />
-                          <span className="min-w-0">
-                            <span className="block truncate text-[11px] font-medium text-foreground/90">{job.label}</span>
-                            <span className="block truncate text-[10px] text-muted-foreground">{job.detail}</span>
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 <div className="flex max-w-full items-center justify-center gap-3">
                 <div
                   ref={canvasRef}
@@ -2065,6 +2012,30 @@ function Studio() {
                   >
                     <Wand2 className="h-3.5 w-3.5" />
                   </button>
+                </div>
+                <div className="flex h-8 max-w-full items-center gap-2 rounded-lg border border-white/10 bg-panel/75 px-2 text-[11px] text-muted-foreground shadow-lg backdrop-blur">
+                  <span className="inline-flex items-center gap-1.5 text-foreground/80">
+                    <Clock3 className="h-3.5 w-3.5 text-emerald-200/80" />
+                    Queue
+                  </span>
+                  <span className={`h-1.5 w-1.5 rounded-full ${latestRenderJob?.status === "running" ? "bg-primary animate-pulse" : latestRenderJob ? "bg-emerald-300" : "bg-muted-foreground/35"}`} />
+                  <span className="max-w-[34vw] truncate">
+                    {latestRenderJob ? `${latestRenderJob.label}: ${latestRenderJob.detail}` : "idle"}
+                  </span>
+                  {renderJobs.length > 1 && (
+                    <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      +{renderJobs.length - 1}
+                    </span>
+                  )}
+                  {renderJobs.length > 0 && (
+                    <button
+                      onClick={() => setRenderJobs([])}
+                      className="ml-auto grid h-5 w-5 place-items-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      title="Clear queue"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
                 </>
                 )}
@@ -2759,7 +2730,6 @@ function AssistantInventoryCard({ card, onAction }: { card: InventoryCard; onAct
   const Icon =
     card.kind === "asset-batch" ? Library :
     card.kind === "storyboard-batch" ? LayoutGrid :
-    card.kind === "director-brief" ? Target :
     card.kind === "render-queue" ? Clock3 :
     Sparkles;
 
