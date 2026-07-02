@@ -9,7 +9,7 @@ import {
   LayoutGrid, Library,
   Target, Play, Sparkles, Search, CheckCircle2, Clock3, Wand2, Volume2, VolumeX,
 } from "lucide-react";
-import { buildMaskDataUrl, compositeWithMask, dataUrlToBase64, loadImage } from "@/lib/imageOps";
+import { buildMaskDataUrl, dataUrlToBase64, loadImage } from "@/lib/imageOps";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -1298,10 +1298,12 @@ function Studio() {
       const isEdit = !!decision.isEdit && !!visibleImage && hasMarkedRegion;
       const imgPrompt = [
         decision.prompt || t,
-        "Style rule: stylized animation/digital art only. No photorealism, no live-action camera look, no realistic human skin texture.",
-        "Keep it suitable for an animated film pipeline with consistent character design, clear silhouettes, graphic lighting, and polished production-art detail.",
+        "Style rule: animation/digital art is the default product language. For new generations, avoid photorealism, live-action camera look, realistic human skin texture, stock-photo interiors, documentary photography, or real-world product photography.",
+        "Build it like an animation expert made it: coherent designed setting, character-safe proportions, intentional color scripting, clean readable silhouette, graphic lighting, polished edges, and production-art detail.",
+        "If this is an edit on an uploaded real photo, preserve the real photo when needed and integrate any animated character/element into it with professional compositing, matching scale, perspective, contact shadows, and light direction. Otherwise keep the entire output in a stylized animated world.",
+        isEdit ? "Marked-region edit rule: use the highlight/brush as the focus for what must change, but return a blended full-frame edit. Do not paste a separate small character, icon, card, sticker, bordered patch, or screenshot inside the highlighted area." : "",
         `Output format: ${activePreset.label}. Compose for ${activePreset.w}x${activePreset.h} (${activePreset.ratio}) and fill the frame edge to edge without letterboxing or empty borders.`,
-      ].join("\n\n");
+      ].filter(Boolean).join("\n\n");
       const imageJobId = createRenderJob(isEdit ? "Image edit" : "Image generation", activePreset.label);
 
       const r = await fetch("/api/image", {
@@ -1313,6 +1315,7 @@ function Studio() {
           mode: isEdit ? "edit" : "generate",
           imageBase64: isEdit && visibleImage ? dataUrlToBase64(visibleImage) : undefined,
           maskBase64: isEdit && maskDataUrl ? dataUrlToBase64(maskDataUrl) : undefined,
+          sourceKind: isEdit && previewAsset?.styleSeed ? "generated" : "uploaded-or-unknown",
         }),
       });
       const data = await r.json();
@@ -1323,11 +1326,7 @@ function Studio() {
         return;
       }
 
-      let finalDataUrl: string = data.dataUrl;
-      if (isEdit && visibleImage && maskDataUrl) {
-        try { finalDataUrl = await compositeWithMask(visibleImage, data.dataUrl, maskDataUrl); }
-        catch (e) { console.error("composite failed, using raw edit", e); }
-      }
+      const finalDataUrl: string = data.dataUrl;
 
       let finalWidth = activePreset.w;
       let finalHeight = activePreset.h;

@@ -1,5 +1,6 @@
-// Client-side image utilities for the strict-composite edit pipeline.
-// Guarantees pixels OUTSIDE the brush mask remain bit-for-bit identical.
+// Client-side image utilities for the marked-region edit pipeline.
+// The mask tells the image model what the user pointed at; the model returns
+// a coherent full-frame edit so shadows, outlines, and style can blend.
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -11,9 +12,9 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-// Build a binary mask PNG (white where strokes are, black elsewhere) at the
-// given output dimensions. `strokes` are in canvas-display coordinates; we
-// scale them to output dims.
+// Build an alpha mask PNG at the given output dimensions. Opaque white marks
+// the user's highlighted/painted focus area; transparent pixels stay context.
+// `strokes` are in canvas-display coordinates; we scale them to output dims.
 export function buildMaskDataUrl(
   strokes: { x: number; y: number }[][],
   displayW: number,
@@ -27,15 +28,16 @@ export function buildMaskDataUrl(
   c.width = outW;
   c.height = outH;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, outW, outH);
+  ctx.clearRect(0, 0, outW, outH);
 
   const sx = outW / Math.max(1, displayW);
   const sy = outH / Math.max(1, displayH);
   const radius = brushRadiusDisplay * Math.max(sx, sy);
 
-  ctx.fillStyle = "#fff";
-  ctx.strokeStyle = "#fff";
+  // GPT Image masks need alpha. Transparent pixels are unmarked context;
+  // opaque white pixels are the user-highlighted edit focus.
+  ctx.fillStyle = "rgba(255,255,255,1)";
+  ctx.strokeStyle = "rgba(255,255,255,1)";
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.lineWidth = radius * 2;
@@ -63,40 +65,4 @@ export function buildMaskDataUrl(
 export function dataUrlToBase64(dataUrl: string): string {
   const i = dataUrl.indexOf(",");
   return i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
-}
-
-// Composite: start with the ORIGINAL image, then paint the AI-edited image
-// only inside the mask. Pixels outside the mask are byte-identical to the
-// original (modulo PNG re-encode, which is lossless).
-export async function compositeWithMask(
-  originalDataUrl: string,
-  editedDataUrl: string,
-  maskDataUrl: string,
-): Promise<string> {
-  const [orig, edit, mask] = await Promise.all([
-    loadImage(originalDataUrl),
-    loadImage(editedDataUrl),
-    loadImage(maskDataUrl),
-  ]);
-  const w = orig.naturalWidth;
-  const h = orig.naturalHeight;
-
-  // Base canvas = original.
-  const out = document.createElement("canvas");
-  out.width = w;
-  out.height = h;
-  const octx = out.getContext("2d")!;
-  octx.drawImage(orig, 0, 0, w, h);
-
-  // Build a masked-edit canvas using destination-in with the mask alpha.
-  const editC = document.createElement("canvas");
-  editC.width = w;
-  editC.height = h;
-  const ectx = editC.getContext("2d")!;
-  ectx.drawImage(edit, 0, 0, w, h);
-  ectx.globalCompositeOperation = "destination-in";
-  ectx.drawImage(mask, 0, 0, w, h);
-
-  octx.drawImage(editC, 0, 0);
-  return out.toDataURL("image/png");
 }
