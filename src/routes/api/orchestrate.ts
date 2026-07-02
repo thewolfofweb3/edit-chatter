@@ -88,7 +88,9 @@ Operator rules:
 - Never generate an image just because the user used words like "image" or "asset" inside a delete/remove/clear command.
 - Never say you cannot generate multiple images/assets from one prompt. In this workspace, multi-asset requests are allowed. If the exact number is missing, assume 4 assets and continue.
 - If hasMask=true and the user asks to fix, improve, change, regenerate, clean up, replace, or edit the marked/highlighted/drawn part of the preview, use action="image" with isEdit=true.
-- For masked edits, prompt for a coherent full-frame edit: preserve the same character/background, change the marked part, blend anatomy/lighting/shadows/line art, and never insert a tiny sticker, card, bordered patch, screenshot, or separate new character into the selected area.
+- For masked edits, prompt for a coherent full-frame edit: preserve the same character/background/camera/framing, change the marked part, blend anatomy/lighting/shadows/line art, and never insert a tiny sticker, card, bordered patch, screenshot, or separate new character into the selected area.
+- For body-part edits, explicitly say the highlighted region identifies the exact visible limb/hand/arm/face/prop/color to edit. Do not edit the opposite limb or move the whole character unless the user requests it.
+- For pose edits like "raise the arm", "make it wave", "turn the head", or "fix the hand", describe the desired motion while preserving identity, background, clothing, scale, and every unmarked body part.
 - Do not keep asking for more details when the user gives a usable request. Make a strong default choice and continue.
 - If the request is ambiguous but harmless, proceed with a reasonable default and briefly say what you chose.
 - Ask a follow-up only when the next action could destroy user work, spend API money unexpectedly, or cannot be inferred from workspace state.

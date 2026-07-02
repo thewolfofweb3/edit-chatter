@@ -10,6 +10,14 @@ type ImageRequest = {
   maskBase64?: string;  // alpha mask: opaque = marked focus, transparent = context
   size?: { width: number; height: number; ratio?: string; label?: string };
   sourceKind?: "generated" | "uploaded-or-unknown";
+  maskHint?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    horizontal: "left" | "center" | "right";
+    vertical: "top" | "middle" | "bottom";
+  };
 };
 
 function openAiImageSize(size?: ImageRequest["size"]): "1024x1024" | "1024x1536" | "1536x1024" | "auto" {
@@ -27,6 +35,12 @@ function configuredImageModel() {
   return model === "gpt-image-2" ? "gpt-image-1" : model;
 }
 
+function editCandidateCount() {
+  const parsed = Number.parseInt(process.env.OPENAI_EDIT_CANDIDATES || "2", 10);
+  if (!Number.isFinite(parsed)) return 2;
+  return Math.max(1, Math.min(4, parsed));
+}
+
 function animationPrompt(prompt: string, size?: ImageRequest["size"]) {
   return [
     "Reel Studio visual identity: animation-first, digital-film production art. Default to stylized animation, anime/cinematic animation, cel-shaded illustration, graphic novel, motion-design, or polished game-cinematic concept art.",
@@ -38,21 +52,33 @@ function animationPrompt(prompt: string, size?: ImageRequest["size"]) {
   ].filter(Boolean).join("\n");
 }
 
-function editPrompt(prompt: string, size?: ImageRequest["size"], sourceKind: ImageRequest["sourceKind"] = "uploaded-or-unknown") {
+function editPrompt(
+  prompt: string,
+  size?: ImageRequest["size"],
+  sourceKind: ImageRequest["sourceKind"] = "uploaded-or-unknown",
+  maskHint?: ImageRequest["maskHint"],
+  candidate = 1,
+) {
   const sourceRule = sourceKind === "generated"
     ? "The source is a Reel Studio generated output. Keep the result in a fully animated/digital world. If the source drifted into a realistic photo setting, repaint the setting as designed animation background art while preserving the user's requested subject and composition."
     : "The source may be an uploaded real photo. If the user is placing an animated character/object into the photo, preserve the real photo and integrate the animated element like professional compositing/VFX with matched contact shadows, scale, perspective, occlusion, and light direction.";
+  const regionRule = maskHint
+    ? `Marked region cue: the user marked the ${maskHint.vertical}-${maskHint.horizontal} area of the image, covering about ${Math.round(maskHint.width * 100)}% width by ${Math.round(maskHint.height * 100)}% height. Treat that marked area as the exact body part/object to transform. If the user names an arm, hand, leg, face, prop, or color, apply the change to the marked part on that same visible side, not the opposite side.`
+    : "Marked region cue: treat the mask as the exact body part/object the user is pointing at.";
 
   return [
     animationPrompt(prompt, size),
     sourceRule,
+    regionRule,
     "Edit workflow:",
-    "- Treat the alpha mask as the user's marked focus area. Use it to understand what the user is pointing at, but make the final output a coherent full-frame edit, not a pasted sticker or small replacement object.",
-    "- Preserve the same subject, character, camera angle, composition, and background unless the user asks to change them.",
-    "- When changing anatomy, clothing, pose, expression, props, color, lighting, or texture, rebuild the selected area so it blends into the surrounding line art, shadows, perspective, and style.",
-    "- For pose edits, keep the same character identity and body scale; adjust connected anatomy naturally so limbs attach correctly and the silhouette reads clearly.",
+    "- Preserve the background, camera angle, framing, character identity, clothing, colors, line style, lighting direction, and unmarked body parts as tightly as possible.",
+    "- The marked region identifies what to change. It is not permission to replace the scene, swap the character, move the camera, change the background, or edit the opposite limb.",
+    "- When changing anatomy, clothing, pose, expression, props, color, lighting, or texture, rebuild the selected part and its natural connection points so it blends into the surrounding line art, shadows, perspective, and style.",
+    "- For pose edits, keep the same character identity and body scale; adjust only the necessary connected anatomy so limbs attach correctly and the silhouette reads clearly.",
+    "- If the user asks to raise an arm, wave, move a hand, bend a knee, turn a head, or change a facial feature, identify the marked body part first, then transform that same marked part.",
     "- Never insert a tiny new character, icon, card, white box, sticker, screenshot, or bordered patch inside the highlighted area.",
     "- Do not leave visible mask edges, rectangular patches, selection borders, mismatched resolution, or pasted-card artifacts.",
+    `Candidate pass ${candidate}: prioritize scene preservation first, requested edit second, and stylistic consistency third. A boring but accurate edit is better than a dramatic scene rewrite.`,
   ].join("\n");
 }
 
@@ -101,40 +127,52 @@ export const Route = createFileRoute("/api/image")({
         const imageModel = configuredImageModel();
 
         if (body.mode === "edit" && body.imageBase64) {
-          const form = new FormData();
-          form.set("model", imageModel);
-          form.set("prompt", editPrompt(body.prompt, body.size, body.sourceKind));
-          form.set("size", size);
-          form.set("quality", process.env.OPENAI_IMAGE_QUALITY || "high");
-          form.set("image", base64ToFile(body.imageBase64, "source.png"));
-          if (body.maskBase64) {
-            form.set("mask", base64ToFile(body.maskBase64, "mask.png"));
-          }
+          const attempts = editCandidateCount();
+          let lastError = "";
 
-          const upstream = await fetch("https://api.openai.com/v1/images/edits", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${key}` },
-            body: form,
-          });
+          for (let attempt = 1; attempt <= attempts; attempt++) {
+            const form = new FormData();
+            form.set("model", imageModel);
+            form.set("prompt", editPrompt(body.prompt, body.size, body.sourceKind, body.maskHint, attempt));
+            form.set("size", size);
+            form.set("quality", process.env.OPENAI_IMAGE_QUALITY || "high");
+            form.set("image", base64ToFile(body.imageBase64, "source.png"));
+            if (body.maskBase64) {
+              form.set("mask", base64ToFile(body.maskBase64, "mask.png"));
+            }
 
-          if (!upstream.ok) {
-            const errText = await upstream.text();
-            return new Response(
-              JSON.stringify({ error: `OpenAI ${upstream.status}: ${errText.slice(0, 600)}` }),
-              { status: upstream.status, headers: { "Content-Type": "application/json" } },
-            );
-          }
+            const upstream = await fetch("https://api.openai.com/v1/images/edits", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${key}` },
+              body: form,
+            });
 
-          const data = (await upstream.json()) as { data?: { b64_json?: string; revised_prompt?: string }[] };
-          const b64 = data.data?.[0]?.b64_json;
-          if (!b64) {
-            return new Response(JSON.stringify({ error: "No image returned by OpenAI" }), {
-              status: 502,
+            if (!upstream.ok) {
+              const errText = await upstream.text();
+              lastError = `OpenAI ${upstream.status}: ${errText.slice(0, 600)}`;
+              continue;
+            }
+
+            const data = (await upstream.json()) as { data?: { b64_json?: string; revised_prompt?: string }[] };
+            const b64 = data.data?.[0]?.b64_json;
+            if (!b64) {
+              lastError = "No image returned by OpenAI";
+              continue;
+            }
+
+            return new Response(JSON.stringify({
+              dataUrl: `data:image/png;base64,${b64}`,
+              text: data.data?.[0]?.revised_prompt ?? "",
+              candidateCount: attempts,
+              selectedCandidate: attempt,
+            }), {
+              status: 200,
               headers: { "Content-Type": "application/json" },
             });
           }
-          return new Response(JSON.stringify({ dataUrl: `data:image/png;base64,${b64}`, text: data.data?.[0]?.revised_prompt ?? "" }), {
-            status: 200,
+
+          return new Response(JSON.stringify({ error: lastError || "Image edit failed" }), {
+            status: 502,
             headers: { "Content-Type": "application/json" },
           });
         }

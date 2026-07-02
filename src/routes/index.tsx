@@ -37,6 +37,14 @@ type InventoryCard = {
 type Msg = { id: number; role: "user" | "ai"; text: string; attachments?: Attachment[]; cards?: InventoryCard[] };
 type Chat = { id: number; name: string; messages: Msg[]; updatedAt: number };
 type Sel = { x: number; y: number; w: number; h: number };
+type MaskHint = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  horizontal: "left" | "center" | "right";
+  vertical: "top" | "middle" | "bottom";
+};
 type Tool = "move" | "select" | "brush";
 type Pt = { x: number; y: number };
 type Stroke = Pt[];
@@ -256,6 +264,39 @@ function detectMockIntent(text: string, requestedPresetCount = 0): { kind: "vide
   if (wantVideo && !wantKey && !wantBoard) return { kind: "video", count: 1 };
   if (wantBoard) return { kind: "storyboard", count };
   return { kind: "keyframe", count };
+}
+
+function buildMaskHint(
+  strokes: Stroke[],
+  selections: Sel[],
+  displayW: number,
+  displayH: number,
+): MaskHint | null {
+  const points: Pt[] = [];
+  for (const selection of selections) {
+    points.push(
+      { x: selection.x, y: selection.y },
+      { x: selection.x + selection.w, y: selection.y + selection.h },
+    );
+  }
+  for (const stroke of strokes) points.push(...stroke);
+  if (points.length === 0 || displayW <= 0 || displayH <= 0) return null;
+
+  const minX = Math.max(0, Math.min(...points.map((p) => p.x)));
+  const minY = Math.max(0, Math.min(...points.map((p) => p.y)));
+  const maxX = Math.min(displayW, Math.max(...points.map((p) => p.x)));
+  const maxY = Math.min(displayH, Math.max(...points.map((p) => p.y)));
+  const centerX = (minX + maxX) / 2 / displayW;
+  const centerY = (minY + maxY) / 2 / displayH;
+
+  return {
+    x: minX / displayW,
+    y: minY / displayH,
+    width: Math.max(0.01, (maxX - minX) / displayW),
+    height: Math.max(0.01, (maxY - minY) / displayH),
+    horizontal: centerX < 0.36 ? "left" : centerX > 0.64 ? "right" : "center",
+    vertical: centerY < 0.36 ? "top" : centerY > 0.64 ? "bottom" : "middle",
+  };
 }
 
 function detectRequestedPreset(text: string): number | null {
@@ -1227,11 +1268,13 @@ function Studio() {
     const hasMarkedRegion = hasCanvasMark;
     const userAtts: Attachment[] = [...pendingAttachments];
     let maskDataUrl: string | null = null;
+    let maskHint: MaskHint | null = null;
 
     if (hasMarkedRegion && visibleImage && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
       try {
         const img = await loadImage(visibleImage);
+        maskHint = buildMaskHint(strokes, activeSelections, rect.width, rect.height);
         maskDataUrl = buildMaskDataUrl(
           strokes, rect.width, rect.height, img.naturalWidth, img.naturalHeight, settings.brushSize, activeSelections,
         );
@@ -1303,6 +1346,10 @@ function Studio() {
         `Output format: ${activePreset.label}. Compose for ${activePreset.w}x${activePreset.h} (${activePreset.ratio}) and fill the frame edge to edge without letterboxing or empty borders.`,
       ].filter(Boolean).join("\n\n");
       const imageJobId = createRenderJob(isEdit ? "Image edit" : "Image generation", activePreset.label);
+      if (isEdit) {
+        setThinkingLabel("Testing edit candidates");
+        updateRenderJob(imageJobId, "running", "Preserving scene and matching marked region");
+      }
 
       const r = await fetch("/api/image", {
         method: "POST",
@@ -1314,6 +1361,7 @@ function Studio() {
           imageBase64: isEdit && visibleImage ? dataUrlToBase64(visibleImage) : undefined,
           maskBase64: isEdit && maskDataUrl ? dataUrlToBase64(maskDataUrl) : undefined,
           sourceKind: isEdit && previewAsset?.styleSeed ? "generated" : "uploaded-or-unknown",
+          maskHint: isEdit ? maskHint : undefined,
         }),
       });
       const data = await r.json();
