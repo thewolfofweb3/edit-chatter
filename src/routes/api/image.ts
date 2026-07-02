@@ -21,6 +21,12 @@ type ImageRequest = {
   };
 };
 
+type EditCandidate = {
+  b64: string;
+  revisedPrompt?: string;
+  attempt: number;
+};
+
 function openAiImageSize(size?: ImageRequest["size"]): "1024x1024" | "1024x1536" | "1536x1024" | "auto" {
   if (!size?.width || !size?.height) return "auto";
   const ratio = size.width / size.height;
@@ -40,6 +46,81 @@ function editCandidateCount() {
   const parsed = Number.parseInt(process.env.OPENAI_EDIT_CANDIDATES || "2", 10);
   if (!Number.isFinite(parsed)) return 2;
   return Math.max(1, Math.min(4, parsed));
+}
+
+function dataUrlFromBase64(b64: string) {
+  return `data:image/png;base64,${b64}`;
+}
+
+async function selectBestEditCandidate(params: {
+  candidates: EditCandidate[];
+  sourceBase64: string;
+  prompt: string;
+  maskHint?: ImageRequest["maskHint"];
+  editIntent?: ImageRequest["editIntent"];
+}) {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key || params.candidates.length <= 1) return params.candidates[0];
+
+  const model = process.env.OPENROUTER_IMAGE_JUDGE_MODEL || process.env.OPENROUTER_ORCHESTRATOR_MODEL || "google/gemini-2.5-flash";
+  const region = params.maskHint
+    ? `${params.maskHint.vertical}-${params.maskHint.horizontal}, ${Math.round(params.maskHint.width * 100)}% by ${Math.round(params.maskHint.height * 100)}%`
+    : "unmarked/general edit";
+
+  try {
+    const content: Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    > = [
+      {
+        type: "text",
+        text: [
+          "You are Reel Studio's image edit quality judge.",
+          "Pick the best edited candidate by comparing it to the source image and the user's request.",
+          `User request: ${params.prompt}`,
+          `Edit intent: ${params.editIntent ?? "general-edit"}`,
+          `Marked region: ${region}`,
+          "Scoring priorities, in order:",
+          "1. Preserve the original character/subject identity, pose, body proportions, clothing color, line art, lighting, and scale.",
+          "2. Preserve the original background/camera/framing unless the edit intent is background-swap.",
+          "3. Change the exact marked object/body part on the same visible side. Penalize editing the opposite hand/arm/limb.",
+          "4. Penalize background drift, color drift, posture drift, new characters, sticker patches, and mismatched style.",
+          "Return STRICT JSON only: {\"selected\":1,\"reason\":\"short reason\"}. selected is 1-based candidate number.",
+          "Source image:",
+        ].join("\n"),
+      },
+      { type: "image_url", image_url: { url: dataUrlFromBase64(params.sourceBase64) } },
+    ];
+
+    params.candidates.forEach((candidate, index) => {
+      content.push({ type: "text", text: `Candidate ${index + 1}:` });
+      content.push({ type: "image_url", image_url: { url: dataUrlFromBase64(candidate.b64) } });
+    });
+
+    const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER || "http://localhost:8080",
+        "X-Title": process.env.OPENROUTER_APP_TITLE || "Reel Studio",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content }],
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (!upstream.ok) return params.candidates[0];
+    const data = (await upstream.json()) as { choices?: { message?: { content?: string } }[] };
+    const raw = data.choices?.[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw) as { selected?: number };
+    const selectedIndex = Math.max(0, Math.min(params.candidates.length - 1, (parsed.selected ?? 1) - 1));
+    return params.candidates[selectedIndex] ?? params.candidates[0];
+  } catch {
+    return params.candidates[0];
+  }
 }
 
 function animationPrompt(prompt: string, size?: ImageRequest["size"]) {
@@ -135,6 +216,7 @@ export const Route = createFileRoute("/api/image")({
 
         if (body.mode === "edit" && body.imageBase64) {
           const attempts = editCandidateCount();
+          const candidates: EditCandidate[] = [];
           let lastError = "";
 
           for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -166,12 +248,27 @@ export const Route = createFileRoute("/api/image")({
               lastError = "No image returned by OpenAI";
               continue;
             }
+            candidates.push({
+              b64,
+              revisedPrompt: data.data?.[0]?.revised_prompt,
+              attempt,
+            });
+          }
+
+          if (candidates.length > 0) {
+            const selected = await selectBestEditCandidate({
+              candidates,
+              sourceBase64: body.imageBase64,
+              prompt: body.prompt,
+              maskHint: body.maskHint,
+              editIntent: body.editIntent,
+            });
 
             return new Response(JSON.stringify({
-              dataUrl: `data:image/png;base64,${b64}`,
-              text: data.data?.[0]?.revised_prompt ?? "",
-              candidateCount: attempts,
-              selectedCandidate: attempt,
+              dataUrl: dataUrlFromBase64(selected.b64),
+              text: selected.revisedPrompt ?? "",
+              candidateCount: candidates.length,
+              selectedCandidate: selected.attempt,
             }), {
               status: 200,
               headers: { "Content-Type": "application/json" },

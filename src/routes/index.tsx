@@ -1367,8 +1367,8 @@ function Studio() {
       ].filter(Boolean).join("\n\n");
       const imageJobId = createRenderJob(isEdit ? "Image edit" : "Image generation", activePreset.label);
       if (isEdit) {
-        setThinkingLabel("Testing edit candidates");
-        updateRenderJob(imageJobId, "running", "Preserving scene and matching marked region");
+        setThinkingLabel("Judging edit candidates");
+        updateRenderJob(imageJobId, "running", "Generating and judging preserved edits");
       }
 
       const r = await fetch("/api/image", {
